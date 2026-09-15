@@ -2,11 +2,13 @@ import sqlite3
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from backend.simulator import router as simulator_router
 
 project_dir = Path(__file__).resolve().parent.parent
 db_file = project_dir / "database" / "siem.db"
 
 app = FastAPI(title="SIEM Backend", version="1.0")
+app.include_router(simulator_router)
 
 app.add_middleware(
     CORSMiddleware,
