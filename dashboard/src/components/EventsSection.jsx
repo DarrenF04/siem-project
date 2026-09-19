@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Server, X, SlidersHorizontal } from "lucide-react";
+import { Search, ScrollText, X, ChevronRight, Eye } from "lucide-react";
 
 export default function EventsSection({
   events,
@@ -17,7 +17,8 @@ export default function EventsSection({
   loading,
   getSeverityClass,
 }) {
-  const [displayLimit, setDisplayLimit] = useState(10);
+  const [displayLimit, setDisplayLimit] = useState(15);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const isFiltered =
     eventSearch !== "" ||
@@ -34,43 +35,53 @@ export default function EventsSection({
 
   const displayedEvents = filteredEvents.slice(0, displayLimit);
 
+  const formatTimestamp = (ts) => {
+    if (!ts) return "-";
+    // If ISO string like 2025-02-15T18:05:11
+    const parts = ts.split("T");
+    if (parts.length === 2) {
+      const timePart = parts[1].slice(0, 8);
+      const datePart = parts[0];
+      return `${datePart} ${timePart}`;
+    }
+    return ts.slice(0, 19);
+  };
+
   return (
-    <section className="panel large-panel" id="events-section">
-      <div className="panel-header section-header-split">
-        <div>
-          <div className="section-kicker">
-            <Server size={13} />
-            <span>RAW LOG STREAM</span>
-          </div>
-          <h2>Recent Security Events</h2>
-          <p>Latest raw security events received and indexed by the SIEM</p>
+    <section className="card modern-table-card events-panel" id="events-section">
+      {/* CARD TOP: TITLE & COMPACT SEARCH */}
+      <div className="card-header modern-table-header">
+        <div className="card-title-wrap">
+          <ScrollText size={15} className="card-title-icon text-muted" />
+          <h3 className="modern-table-title">Security Events Stream</h3>
         </div>
 
-        <div className="search-box">
-          <Search size={16} />
+        {/* Compact Search */}
+        <div className="search-field-compact">
+          <Search size={14} className="search-field-icon" />
           <input
             type="text"
-            placeholder="Search IP, host, or payload..."
+            placeholder="Search events..."
             value={eventSearch}
             onChange={(e) => setEventSearch(e.target.value)}
           />
           {eventSearch && (
             <button
-              className="search-clear-btn"
+              className="search-clear-action"
               onClick={() => setEventSearch("")}
               type="button"
+              aria-label="Clear search"
             >
-              <X size={13} />
+              <X size={12} />
             </button>
           )}
         </div>
       </div>
 
-      {/* EVENT FILTERS */}
-      <div className="event-filters">
-        <div className="filters-group">
-          <div className="filter-select-wrapper">
-            <SlidersHorizontal size={14} className="filter-icon" />
+      {/* FILTER TOOLBAR */}
+      <div className="modern-table-toolbar">
+        <div className="modern-filters-row">
+          <div className="filter-select-compact">
             <select
               value={eventSeverity}
               onChange={(e) => setEventSeverity(e.target.value)}
@@ -85,7 +96,7 @@ export default function EventsSection({
             </select>
           </div>
 
-          <div className="filter-select-wrapper">
+          <div className="filter-select-compact">
             <select
               value={eventType}
               onChange={(e) => setEventType(e.target.value)}
@@ -100,7 +111,7 @@ export default function EventsSection({
             </select>
           </div>
 
-          <div className="filter-select-wrapper">
+          <div className="filter-select-compact">
             <select
               value={eventSourceIp}
               onChange={(e) => setEventSourceIp(e.target.value)}
@@ -116,148 +127,216 @@ export default function EventsSection({
           </div>
 
           {isFiltered && (
-            <button className="clear-filters" onClick={clearFilters} type="button">
-              <X size={14} />
+            <button className="btn-filter-reset-compact" onClick={clearFilters} type="button">
+              <X size={11} />
               <span>Reset</span>
             </button>
           )}
         </div>
 
-        <div className="filter-result-count">
-          Showing <strong>{filteredEvents.length}</strong> of{" "}
-          <strong>{events.length}</strong> events
+        <div className="modern-table-counter">
+          {filteredEvents.length} event{filteredEvents.length !== 1 ? "s" : ""}
         </div>
       </div>
 
-      {/* EVENTS TABLE */}
-      <div className="table-container">
-        <table>
+      {/* MINIMAL ENTERPRISE EVENTS TABLE */}
+      <div className="table-responsive">
+        <table className="modern-enterprise-table events-table">
           <thead>
             <tr>
-              <th style={{ width: "170px" }}>Timestamp</th>
-              <th>Event Type</th>
-              <th>Source IP</th>
-              <th>Source</th>
-              <th>Severity</th>
-              <th>Details</th>
+              <th style={{ width: "170px" }}>Time</th>
+              <th>Event</th>
+              <th style={{ width: "160px" }}>Source IP</th>
+              <th style={{ width: "140px" }}>Source</th>
+              <th style={{ width: "110px" }}>Severity</th>
+              <th style={{ width: "80px", textAlign: "right" }}>Action</th>
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="empty">
-                  <div className="empty-state">
-                    <span className="empty-spinner"></span>
-                    <p>Streaming security events...</p>
+                <td colSpan="6" className="empty-cell">
+                  <div className="empty-message-wrap">
+                    <span className="loading-spinner" />
+                    <span>Loading security events stream...</span>
                   </div>
                 </td>
               </tr>
             ) : events.length === 0 ? (
               <tr>
-                <td colSpan="6" className="empty">
-                  <div className="empty-state">
-                    <Server size={32} className="empty-icon" />
-                    <p>No security events recorded yet</p>
-                    <span>Waiting for ingest daemon telemetry...</span>
+                <td colSpan="6" className="empty-cell">
+                  <div className="empty-message-wrap">
+                    <ScrollText size={18} className="empty-state-icon text-muted" />
+                    <span className="empty-title">No events recorded</span>
                   </div>
                 </td>
               </tr>
             ) : filteredEvents.length === 0 ? (
               <tr>
-                <td colSpan="6" className="empty">
-                  <div className="empty-state">
-                    <Search size={32} className="empty-icon" />
-                    <p>No events match the current filter criteria</p>
-                    <button className="empty-reset-btn" onClick={clearFilters} type="button">
+                <td colSpan="6" className="empty-cell">
+                  <div className="empty-message-wrap">
+                    <Search size={20} className="empty-state-icon text-muted" />
+                    <span className="empty-title">No matching events found</span>
+                    <button className="btn-empty-reset" onClick={clearFilters} type="button">
                       Clear filters
                     </button>
                   </div>
                 </td>
               </tr>
             ) : (
-              displayedEvents.map((event) => (
-                <tr key={event.id} className="event-row">
-                  <td className="time-cell">
-                    <span className="timestamp-mono">
-                      {event.timestamp
-                        ? event.timestamp.replace("T", " ").slice(0, 19)
-                        : "-"}
-                    </span>
-                  </td>
+              displayedEvents.map((event) => {
+                const sevKey = getSeverityClass(event.severity);
 
-                  <td>
-                    <span className="event-type-badge">
-                      {event.event_type}
-                    </span>
-                  </td>
+                return (
+                  <tr
+                    key={event.id}
+                    className="modern-table-row"
+                    onClick={() => setSelectedEvent(event)}
+                    tabIndex={0}
+                    title="Click to view full event details"
+                  >
+                    <td>
+                      <span className="row-time-text">{formatTimestamp(event.timestamp)}</span>
+                    </td>
 
-                  <td>
-                    <span className="ip ip-pill">{event.source_ip}</span>
-                  </td>
+                    <td>
+                      <span className="event-type-clean">{event.event_type}</span>
+                    </td>
 
-                  <td>
-                    <span className="source-tag">{event.source}</span>
-                  </td>
+                    <td>
+                      <span className="ip-mono-clean">{event.source_ip}</span>
+                    </td>
 
-                  <td>
-                    <span
-                      className={`severity ${getSeverityClass(
-                        event.severity
-                      )}`}
-                    >
-                      <span className="severity-badge-dot"></span>
-                      {event.severity}
-                    </span>
-                  </td>
+                    <td>
+                      <span className="source-subsystem-tag">{event.source || "System"}</span>
+                    </td>
 
-                  <td className="details-cell">
-                    <span className="details-text" title={event.details}>
-                      {event.details}
-                    </span>
-                  </td>
-                </tr>
-              ))
+                    <td>
+                      <span className={`badge-pill-compact sev-${sevKey}`}>
+                        <span className="pill-dot" />
+                        {event.severity}
+                      </span>
+                    </td>
+
+                    <td style={{ textAlign: "right" }}>
+                      <button
+                        type="button"
+                        className="btn-action-view"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedEvent(event);
+                        }}
+                        title="View event payload details"
+                      >
+                        <span>View</span>
+                        <ChevronRight size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination / Limit toggle (defaults to 10) */}
+      {/* COMPACT PAGINATION FOOTER */}
       {filteredEvents.length > 10 && (
-        <div className="table-footer-controls">
-          <span className="footer-status-text">
-            Displaying {displayedEvents.length} of {filteredEvents.length} events
+        <div className="modern-table-footer">
+          <span className="footer-count-text">
+            Showing {displayedEvents.length} of {filteredEvents.length}
           </span>
-          <div className="limit-buttons">
+          <div className="pagination-pills-compact">
+            {[10, 25, 50].map((limit) => (
+              <button
+                key={limit}
+                className={`pill-btn-compact ${displayLimit === limit ? "active" : ""}`}
+                onClick={() => setDisplayLimit(limit)}
+                type="button"
+              >
+                {limit}
+              </button>
+            ))}
             <button
-              className={`limit-btn ${displayLimit === 10 ? "active" : ""}`}
-              onClick={() => setDisplayLimit(10)}
-              type="button"
-            >
-              10
-            </button>
-            <button
-              className={`limit-btn ${displayLimit === 25 ? "active" : ""}`}
-              onClick={() => setDisplayLimit(25)}
-              type="button"
-            >
-              25
-            </button>
-            <button
-              className={`limit-btn ${displayLimit === 50 ? "active" : ""}`}
-              onClick={() => setDisplayLimit(50)}
-              type="button"
-            >
-              50
-            </button>
-            <button
-              className={`limit-btn ${displayLimit >= filteredEvents.length ? "active" : ""}`}
+              className={`pill-btn-compact ${displayLimit >= filteredEvents.length ? "active" : ""}`}
               onClick={() => setDisplayLimit(filteredEvents.length)}
               type="button"
             >
-              All ({filteredEvents.length})
+              All
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* EVENT DETAILS MODAL (ACCESSIBLE ON ROW CLICK) */}
+      {selectedEvent && (
+        <div className="modal-backdrop" onClick={() => setSelectedEvent(null)}>
+          <div
+            className="modal-window event-detail-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="modal-header">
+              <div className="modal-header-info">
+                <span className="modal-category">Event Telemetry Inspector</span>
+                <h3 className="modal-title">{selectedEvent.event_type}</h3>
+              </div>
+              <button
+                className="modal-close-action"
+                onClick={() => setSelectedEvent(null)}
+                type="button"
+                aria-label="Close modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="modal-body-content">
+              <div className="event-meta-grid">
+                <div className="event-meta-item">
+                  <span className="meta-label">Event ID</span>
+                  <span className="meta-val-mono">#{selectedEvent.id}</span>
+                </div>
+                <div className="event-meta-item">
+                  <span className="meta-label">Timestamp</span>
+                  <span className="meta-val-mono">{selectedEvent.timestamp || "-"}</span>
+                </div>
+                <div className="event-meta-item">
+                  <span className="meta-label">Source IP</span>
+                  <span className="meta-val-mono">{selectedEvent.source_ip}</span>
+                </div>
+                <div className="event-meta-item">
+                  <span className="meta-label">Origin Subsystem</span>
+                  <span className="meta-val-text">{selectedEvent.source || "Unknown"}</span>
+                </div>
+                <div className="event-meta-item">
+                  <span className="meta-label">Severity</span>
+                  <span className={`badge-pill-compact sev-${getSeverityClass(selectedEvent.severity)}`}>
+                    <span className="pill-dot" />
+                    {selectedEvent.severity}
+                  </span>
+                </div>
+              </div>
+
+              <div className="event-payload-box">
+                <span className="meta-label">Raw Log Message / Details</span>
+                <pre className="event-payload-code">
+                  {selectedEvent.details || "No raw payload details provided."}
+                </pre>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setSelectedEvent(null)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

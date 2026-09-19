@@ -1,18 +1,14 @@
 import { useEffect } from "react";
 import {
   X,
-  ShieldAlert,
-  Flame,
-  Globe,
-  Gauge,
-  Clock,
   ArrowRight,
-  CheckCircle,
+  CheckCircle2,
   XCircle,
-  FileCode,
-  Terminal,
+  Clock,
   Activity,
-  Layers,
+  Terminal,
+  FileCode,
+  ShieldCheck,
 } from "lucide-react";
 
 export default function InvestigationModal({
@@ -22,7 +18,6 @@ export default function InvestigationModal({
   events,
   getSeverityClass,
 }) {
-  // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
@@ -45,263 +40,207 @@ export default function InvestigationModal({
 
   const riskScore = selectedIncident.risk_score || 0;
 
+  const getRiskScoreClass = (score) => {
+    if (score >= 80) return "risk-critical";
+    if (score >= 60) return "risk-high";
+    if (score >= 40) return "risk-medium";
+    return "risk-low";
+  };
+
+  const riskClass = getRiskScoreClass(riskScore);
+
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div
-        className="investigation-modal"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal-window" onClick={(e) => e.stopPropagation()}>
         {/* MODAL HEADER */}
-        <div className="investigation-header">
-          <div className="investigation-title-group">
-            <div className="investigation-kicker">
-              <span className="investigation-label">SECURITY INCIDENT TRIAGE</span>
-              <span className="investigation-id-pill">#{selectedIncident.id}</span>
-            </div>
+        <div className="modal-header">
+          <div className="modal-title-row">
+            <span className="id-badge">#{selectedIncident.id}</span>
             <h2>{selectedIncident.incident_type}</h2>
-            <p>
-              Incident #{selectedIncident.id} &bull; Detected on host vector{" "}
-              <code className="modal-ip-inline">{selectedIncident.source_ip}</code>
-            </p>
           </div>
 
           <button
-            className="close-button"
+            className="modal-close-btn"
             onClick={onClose}
-            aria-label="Close investigation modal"
+            aria-label="Close investigation"
             type="button"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* INCIDENT OVERVIEW KPI CARDS */}
-        <div className="investigation-grid">
-          {/* Source IP */}
-          <div className="investigation-card">
-            <div className="card-kicker">
-              <Globe size={12} />
-              <span>SOURCE IP</span>
+        <div className="modal-body">
+          {/* PRIMARY INCIDENT METRICS GRID */}
+          <div className="modal-metrics-grid">
+            {/* Attack Classification */}
+            <div className="modal-metric-card">
+              <span className="modal-metric-label">Classification</span>
+              <span className="badge-classification modal-classification-badge">
+                {attackTypeFormatted}
+              </span>
             </div>
-            <strong className="investigation-ip">
-              {selectedIncident.source_ip}
-            </strong>
-          </div>
 
-          {/* Risk Score */}
-          <div className="investigation-card">
-            <div className="card-kicker">
-              <Gauge size={12} />
-              <span>RISK SCORE</span>
+            {/* Source IP */}
+            <div className="modal-metric-card">
+              <span className="modal-metric-label">Source IP</span>
+              <code className="ip-mono modal-ip-large">{selectedIncident.source_ip}</code>
             </div>
-            <div className="modal-risk-row">
-              <strong className="modal-risk-val">{riskScore}</strong>
-              <span className="modal-risk-total">/ 100</span>
-            </div>
-          </div>
 
-          {/* Severity */}
-          <div className="investigation-card">
-            <div className="card-kicker">
-              <ShieldAlert size={12} />
-              <span>SEVERITY</span>
+            {/* Risk Score */}
+            <div className="modal-metric-card">
+              <span className="modal-metric-label">Risk Score</span>
+              <div className="modal-risk-display">
+                <span className={`modal-risk-value text-${riskClass}`}>{riskScore}</span>
+                <span className="modal-risk-scale">/ 100</span>
+              </div>
             </div>
-            <span
-              className={`severity ${getSeverityClass(
-                selectedIncident.severity
-              )}`}
-            >
-              <span className="severity-badge-dot"></span>
-              {selectedIncident.severity}
-            </span>
-          </div>
 
-          {/* Attack Type */}
-          <div className="investigation-card">
-            <div className="card-kicker">
-              <Flame size={12} />
-              <span>CLASSIFICATION</span>
+            {/* Severity */}
+            <div className="modal-metric-card">
+              <span className="modal-metric-label">Severity</span>
+              <span className={`badge-severity sev-${getSeverityClass(selectedIncident.severity)}`}>
+                {selectedIncident.severity}
+              </span>
             </div>
-            <span className="attack-type modal-attack-tag">
-              {attackTypeFormatted}
-            </span>
-          </div>
 
-          {/* Status Control */}
-          <div className="investigation-card status-control-card">
-            <div className="card-kicker">
-              <Activity size={12} />
-              <span>INCIDENT STATUS</span>
-            </div>
-            <div className="status-control">
+            {/* Status Selector */}
+            <div className="modal-metric-card status-change-card">
+              <span className="modal-metric-label">Incident Status</span>
               <select
                 value={selectedIncident.status || "OPEN"}
-                onChange={(e) =>
-                  onUpdateStatus(selectedIncident.id, e.target.value)
-                }
-                className={`status-select status-${(
-                  selectedIncident.status || "OPEN"
-                ).toLowerCase()}`}
+                onChange={(e) => onUpdateStatus(selectedIncident.id, e.target.value)}
+                className={`status-select-control status-${(selectedIncident.status || "open").toLowerCase()}`}
+                aria-label="Update incident status"
               >
-                <option value="OPEN">OPEN (Active Threat)</option>
-                <option value="INVESTIGATING">INVESTIGATING (In Triage)</option>
-                <option value="RESOLVED">RESOLVED (Closed)</option>
+                <option value="OPEN">OPEN</option>
+                <option value="INVESTIGATING">INVESTIGATING</option>
+                <option value="RESOLVED">RESOLVED</option>
               </select>
             </div>
           </div>
-        </div>
 
-        {/* CORRELATION ANALYSIS */}
-        <div className="investigation-section">
-          <div className="section-title-wrap">
-            <Layers size={15} className="text-purple" />
-            <div>
-              <h3>Attack Classification & Correlation</h3>
-              <span className="section-sub">
-                Rule-based event correlation and kill chain progression
-              </span>
+          {/* ATTACK KILL CHAIN / CORRELATION LOGIC */}
+          <div className="modal-section-card">
+            <div className="modal-section-title">
+              <Activity size={15} className="section-icon" />
+              <h4>Attack Kill Chain & Correlation</h4>
             </div>
-          </div>
 
-          {/* Banner */}
-          <div className="attack-classification-banner">
-            <div className="banner-left">
-              <Flame size={18} className="banner-icon" />
-              <div>
-                <span>DETECTED ATTACK SIGNATURE</span>
-                <strong>{attackTypeFormatted}</strong>
+            {selectedIncident.message && (
+              <div className="correlation-narrative-box">
+                <span className="narrative-label">Correlation Narrative</span>
+                <p className="narrative-text">{selectedIncident.message}</p>
               </div>
-            </div>
-            <span className="banner-meta">MITRE ATT&CK ALIGNED</span>
-          </div>
+            )}
 
-          {/* Message */}
-          <div className="investigation-message-box">
-            <span className="message-label">CORRELATION NARRATIVE</span>
-            <p className="investigation-message">{selectedIncident.message}</p>
-          </div>
-
-          {/* 3-Step Correlation Flow */}
-          <div className="flow-container">
-            <span className="flow-title">ATTACK KILL CHAIN SEQUENCE</span>
-            <div className="correlation-flow">
+            {/* 3-Step Sequence */}
+            <div className="kill-chain-flow">
               {/* Step 1: Failed Logins */}
-              <div className="flow-step">
-                <div className="step-header">
-                  <span className="step-num">STAGE 01</span>
-                  <Terminal size={14} />
+              <div className="chain-step">
+                <div className="chain-step-header">
+                  <Terminal size={13} />
+                  <span>Phase 1: Infiltration</span>
                 </div>
-                <strong>{selectedIncident.failed_logins ?? 0}</strong>
-                <span>Failed Logins</span>
+                <div className="chain-step-val">
+                  <strong>{selectedIncident.failed_logins ?? 0}</strong>
+                  <span>Failed Logins</span>
+                </div>
               </div>
 
-              <div className="flow-arrow">
-                <ArrowRight size={20} />
+              <div className="chain-arrow">
+                <ArrowRight size={16} />
               </div>
 
               {/* Step 2: Successful Login */}
               <div
-                className={`flow-step ${
-                  selectedIncident.successful_login
-                    ? "step-breached"
-                    : "step-safe"
+                className={`chain-step ${
+                  selectedIncident.successful_login ? "chain-breached" : "chain-normal"
                 }`}
               >
-                <div className="step-header">
-                  <span className="step-num">STAGE 02</span>
+                <div className="chain-step-header">
                   {selectedIncident.successful_login ? (
-                    <XCircle size={14} className="text-red" />
+                    <XCircle size={13} className="text-critical" />
                   ) : (
-                    <CheckCircle size={14} className="text-green" />
+                    <CheckCircle2 size={13} className="text-low" />
                   )}
+                  <span>Phase 2: Auth</span>
                 </div>
-                <strong
-                  className={
-                    selectedIncident.successful_login
-                      ? "text-red"
-                      : "text-green"
-                  }
-                >
-                  {selectedIncident.successful_login ? "YES" : "NO"}
-                </strong>
-                <span>Successful Login</span>
+                <div className="chain-step-val">
+                  <strong className={selectedIncident.successful_login ? "text-critical" : "text-low"}>
+                    {selectedIncident.successful_login ? "COMPROMISED" : "BLOCKED"}
+                  </strong>
+                  <span>Login Success</span>
+                </div>
               </div>
 
-              <div className="flow-arrow">
-                <ArrowRight size={20} />
+              <div className="chain-arrow">
+                <ArrowRight size={16} />
               </div>
 
-              {/* Step 3: Command Executions */}
-              <div className="flow-step">
-                <div className="step-header">
-                  <span className="step-num">STAGE 03</span>
-                  <FileCode size={14} />
+              {/* Step 3: Commands Executed */}
+              <div className="chain-step">
+                <div className="chain-step-header">
+                  <FileCode size={13} />
+                  <span>Phase 3: Execution</span>
                 </div>
-                <strong>{selectedIncident.command_executions ?? 0}</strong>
-                <span>Commands Executed</span>
+                <div className="chain-step-val">
+                  <strong>{selectedIncident.command_executions ?? 0}</strong>
+                  <span>Commands Executed</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* RELATED SECURITY EVENTS */}
-        <div className="investigation-section">
-          <div className="related-events-header">
-            <div className="section-title-wrap">
-              <Clock size={15} className="text-cyan" />
-              <div>
-                <h3>Related Security Events</h3>
-                <p>
-                  Events originating from or associated with source IP{" "}
-                  <code className="modal-ip-inline">
-                    {selectedIncident.source_ip}
-                  </code>
-                </p>
+          {/* RELATED SECURITY EVIDENCE */}
+          <div className="modal-section-card">
+            <div className="modal-section-title split-title">
+              <div className="title-left">
+                <Clock size={15} className="section-icon" />
+                <h4>Correlated Security Events</h4>
               </div>
+              <span className="evidence-count-pill">{relatedEvents.length} Events Logged</span>
             </div>
 
-            <span className="event-count-badge">
-              {relatedEvents.length} events logged
-            </span>
-          </div>
-
-          <div className="related-events">
-            {relatedEvents.length === 0 ? (
-              <div className="no-related-events">
-                No individual security events found matching this source IP.
-              </div>
-            ) : (
-              relatedEvents.slice(0, 15).map((event) => (
-                <div className="related-event" key={event.id}>
-                  <div className="event-time">
-                    {event.timestamp
-                      ? event.timestamp.replace("T", " ").slice(0, 19)
-                      : "-"}
-                  </div>
-
-                  <div className="event-type">
-                    <span className="event-type-pill">{event.event_type}</span>
-                  </div>
-
-                  <div className="event-details" title={event.details}>
-                    {event.details}
-                  </div>
-
-                  <div className="event-sev-wrap">
-                    <span
-                      className={`severity ${getSeverityClass(
-                        event.severity
-                      )}`}
-                    >
-                      {event.severity}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
+            <div className="modal-evidence-table-wrap">
+              {relatedEvents.length === 0 ? (
+                <div className="empty-subtext">No individual log events linked to this source IP.</div>
+              ) : (
+                <table className="mini-evidence-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "150px" }}>Timestamp</th>
+                      <th style={{ width: "160px" }}>Event Type</th>
+                      <th>Details</th>
+                      <th style={{ width: "90px" }}>Severity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {relatedEvents.slice(0, 15).map((ev) => (
+                      <tr key={ev.id}>
+                        <td className="time-mono">
+                          {ev.timestamp ? ev.timestamp.replace("T", " ").slice(0, 19) : "-"}
+                        </td>
+                        <td>
+                          <span className="badge-event-type">{ev.event_type}</span>
+                        </td>
+                        <td className="details-text-cell" title={ev.details}>
+                          {ev.details}
+                        </td>
+                        <td>
+                          <span className={`badge-severity sev-${getSeverityClass(ev.severity)}`}>
+                            {ev.severity}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+

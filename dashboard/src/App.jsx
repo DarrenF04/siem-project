@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
-import StatCards from "./components/StatCards";
-import EngineStatus from "./components/EngineStatus";
-import AnalyticsCharts from "./components/AnalyticsCharts";
-import IncidentsSection from "./components/IncidentsSection";
-import EventsSection from "./components/EventsSection";
+import DashboardPage from "./pages/DashboardPage";
+import IncidentsPage from "./pages/IncidentsPage";
+import EventsPage from "./pages/EventsPage";
+import SourcesPage from "./pages/SourcesPage";
+import AttackSimulator from "./AttackSimulator";
 import InvestigationModal from "./components/InvestigationModal";
 
 import "./App.css";
@@ -23,12 +22,95 @@ function App() {
     open_incidents: 0,
   });
 
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem("siem-theme") || "dark";
+    } catch {
+      return "dark";
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem("siem-theme", theme);
+    } catch {
+      // Storage fallback
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
+
+  // Dedicated Page Routing (dashboard, incidents, events, sources, simulator)
+  const [activePage, setActivePage] = useState(() => {
+    try {
+      const hash = window.location.hash.replace("#/", "").replace("#", "");
+      const validPages = ["dashboard", "incidents", "events", "sources", "simulator"];
+      return validPages.includes(hash) ? hash : "dashboard";
+    } catch {
+      return "dashboard";
+    }
+  });
+
+  // Keep browser hash in sync
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace("#/", "").replace("#", "");
+      const validPages = ["dashboard", "incidents", "events", "sources", "simulator"];
+      if (validPages.includes(hash)) {
+        setActivePage(hash);
+      }
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  const handleNavigate = (pageId) => {
+    setActivePage(pageId);
+    window.location.hash = `#/${pageId}`;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Simulated attacks state with geo-coordinates for World Threat Map
+  const [simulatedAttacks, setSimulatedAttacks] = useState(() => {
+    try {
+      const saved = localStorage.getItem("siem-simulated-attacks");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // Fallback
+    }
+    return [
+      {
+        ip: "192.168.100.45",
+        location: "New York, USA",
+        scenarioTitle: "Account Compromise",
+        attackType: "ACCOUNT_COMPROMISE",
+        events: 7,
+        timestamp: "Initial Seed",
+      },
+    ];
+  });
+
+  const handleAttackSimulated = (newAttack) => {
+    setSimulatedAttacks((prev) => {
+      const updated = [newAttack, ...prev].slice(0, 10);
+      try {
+        localStorage.setItem("siem-simulated-attacks", JSON.stringify(updated));
+      } catch {
+        // Fallback
+      }
+      return updated;
+    });
+  };
+
   const [events, setEvents] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [activeSection, setActiveSection] = useState("dashboard-top");
 
   // Filter states for Events
   const [eventSearch, setEventSearch] = useState("");
@@ -44,18 +126,6 @@ function App() {
 
   // Selected incident for investigation modal
   const [selectedIncident, setSelectedIncident] = useState(null);
-
-  // Smooth scroll handler
-  const scrollToSection = (sectionId) => {
-    setActiveSection(sectionId);
-    const section = document.getElementById(sectionId);
-    if (section) {
-      section.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }
-  };
 
   // Event derived filters
   const eventTypes = [
@@ -166,7 +236,7 @@ function App() {
     ),
   ];
 
-  // Data fetching
+  // Data fetching from backend API
   const fetchData = useCallback(async () => {
     try {
       const [statisticsResponse, eventsResponse, incidentsResponse] =
@@ -199,7 +269,7 @@ function App() {
     }
   }, []);
 
-  // Manual refresh trigger with button animation
+  // Manual refresh trigger
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     await fetchData();
@@ -220,10 +290,8 @@ function App() {
         throw new Error("Failed to update incident status");
       }
 
-      // Refresh dashboard data
       await fetchData();
 
-      // Update currently opened incident in modal
       setSelectedIncident((current) =>
         current
           ? {
@@ -237,7 +305,7 @@ function App() {
     }
   };
 
-  // Polling hook (every 2 seconds) - safely invoked without synchronous setState warnings
+  // Polling hook (every 2 seconds)
   useEffect(() => {
     let isSubscribed = true;
 
@@ -267,72 +335,94 @@ function App() {
 
   return (
     <div className="app">
-      {/* SIDEBAR NAVIGATION */}
-      <Sidebar
-        activeSection={activeSection}
-        scrollToSection={scrollToSection}
+      {/* TOP NAVIGATION & HEADER */}
+      <Header
+        lastUpdated={lastUpdated}
+        onRefresh={handleManualRefresh}
+        isRefreshing={isRefreshing}
+        statistics={statistics}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        activePage={activePage}
+        onNavigate={handleNavigate}
       />
 
-      {/* MAIN OPERATIONS WORKSPACE */}
-      <main className="main" id="dashboard-top">
-        {/* HEADER & TELEMETRY POSTURE */}
-        <Header
-          lastUpdated={lastUpdated}
-          onRefresh={handleManualRefresh}
-          isRefreshing={isRefreshing}
-          statistics={statistics}
-        />
+      {/* MAIN DEDICATED PAGE WORKSPACE */}
+      <main className="main-workspace">
+        {/* 1. DASHBOARD PAGE (CHARTS ONLY — NO TABLES) */}
+        {activePage === "dashboard" && (
+          <DashboardPage
+            statistics={statistics}
+            severityData={severityData}
+            eventTypeData={eventTypeData}
+            sourceIpData={sourceIpData}
+            simulatedAttacks={simulatedAttacks}
+            theme={theme}
+          />
+        )}
 
-        {/* PRIMARY TELEMETRY KPI METRICS */}
-        <StatCards statistics={statistics} />
+        {/* 2. INCIDENTS PAGE (DEDICATED) */}
+        {activePage === "incidents" && (
+          <IncidentsPage
+            incidents={incidents}
+            filteredIncidents={filteredIncidents}
+            incidentSearch={incidentSearch}
+            setIncidentSearch={setIncidentSearch}
+            incidentSeverity={incidentSeverity}
+            setIncidentSeverity={setIncidentSeverity}
+            incidentStatus={incidentStatus}
+            setIncidentStatus={setIncidentStatus}
+            incidentAttackType={incidentAttackType}
+            setIncidentAttackType={setIncidentAttackType}
+            incidentAttackTypes={incidentAttackTypes}
+            onSelectIncident={setSelectedIncident}
+            loading={loading}
+            getSeverityClass={getSeverityClass}
+            statistics={statistics}
+          />
+        )}
 
-        {/* SEVERITY BREAKDOWN & ENGINE STATUS */}
-        <EngineStatus statistics={statistics} />
+        {/* 3. EVENTS PAGE (DEDICATED) */}
+        {activePage === "events" && (
+          <EventsPage
+            events={events}
+            filteredEvents={filteredEvents}
+            eventSearch={eventSearch}
+            setEventSearch={setEventSearch}
+            eventSeverity={eventSeverity}
+            setEventSeverity={setEventSeverity}
+            eventType={eventType}
+            setEventType={setEventType}
+            eventSourceIp={eventSourceIp}
+            setEventSourceIp={setEventSourceIp}
+            eventTypes={eventTypes}
+            sourceIps={sourceIps}
+            loading={loading}
+            getSeverityClass={getSeverityClass}
+            theme={theme}
+          />
+        )}
 
-        {/* VISUAL ANALYTICS & SOURCE CHARTS */}
-        <AnalyticsCharts
-          severityData={severityData}
-          eventTypeData={eventTypeData}
-          sourceIpData={sourceIpData}
-        />
+        {/* 4. SOURCES PAGE (DEDICATED) */}
+        {activePage === "sources" && (
+          <SourcesPage
+            events={events}
+            incidents={incidents}
+            sourceIpData={sourceIpData}
+            onSelectIncident={setSelectedIncident}
+            theme={theme}
+          />
+        )}
 
-        {/* INCIDENTS MANAGEMENT SECTION */}
-        <IncidentsSection
-          incidents={incidents}
-          filteredIncidents={filteredIncidents}
-          incidentSearch={incidentSearch}
-          setIncidentSearch={setIncidentSearch}
-          incidentSeverity={incidentSeverity}
-          setIncidentSeverity={setIncidentSeverity}
-          incidentStatus={incidentStatus}
-          setIncidentStatus={setIncidentStatus}
-          incidentAttackType={incidentAttackType}
-          setIncidentAttackType={setIncidentAttackType}
-          incidentAttackTypes={incidentAttackTypes}
-          onSelectIncident={setSelectedIncident}
-          loading={loading}
-          getSeverityClass={getSeverityClass}
-        />
+        {/* 5. ATTACK SIMULATOR PAGE (DEDICATED) */}
+        {activePage === "simulator" && (
+          <AttackSimulator
+            onAttackSimulated={handleAttackSimulated}
+            recentSimulations={simulatedAttacks}
+          />
+        )}
 
-        {/* RECENT SECURITY LOG EVENTS STREAM */}
-        <EventsSection
-          events={events}
-          filteredEvents={filteredEvents}
-          eventSearch={eventSearch}
-          setEventSearch={setEventSearch}
-          eventSeverity={eventSeverity}
-          setEventSeverity={setEventSeverity}
-          eventType={eventType}
-          setEventType={setEventType}
-          eventSourceIp={eventSourceIp}
-          setEventSourceIp={setEventSourceIp}
-          eventTypes={eventTypes}
-          sourceIps={sourceIps}
-          loading={loading}
-          getSeverityClass={getSeverityClass}
-        />
-
-        {/* INCIDENT INVESTIGATION MODAL */}
+        {/* INCIDENT INVESTIGATION MODAL (AVAILABLE ACROSS ALL PAGES) */}
         <InvestigationModal
           selectedIncident={selectedIncident}
           onClose={() => setSelectedIncident(null)}
