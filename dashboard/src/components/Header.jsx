@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Shield,
   RefreshCw,
@@ -6,6 +7,7 @@ import {
   Bell,
   Plus,
 } from "lucide-react";
+import NotificationPopover from "./NotificationPopover";
 
 export default function Header({
   lastUpdated,
@@ -16,12 +18,17 @@ export default function Header({
   onToggleTheme,
   activePage = "dashboard",
   onNavigate,
+  alerts = [],
+  onDismissAlert,
+  onDismissAllAlerts,
+  onSelectIncident,
+  incidents = [],
 }) {
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const navItems = [
     { id: "dashboard", label: "Dashboard" },
     { id: "incidents", label: "Incidents" },
     { id: "events", label: "Events" },
-    { id: "sources", label: "Sources" },
     { id: "simulator", label: "Simulator" },
   ];
 
@@ -31,10 +38,9 @@ export default function Header({
   // Dynamic titles per page
   const pageTitles = {
     dashboard: "Security Operations Overview",
-    incidents: "Security Incidents Queue & Triage",
-    events: "Live Security Event Telemetry Stream",
-    sources: "Source IP Threat Directory & Origin Share",
-    simulator: "Cyber Attack Simulator & Validation Suite",
+    incidents: "Security Incidents Queue",
+    events: "Live Security Event",
+    simulator: "Attack Simulation & Testing Console",
   };
 
   return (
@@ -96,19 +102,50 @@ export default function Header({
             <RefreshCw size={16} className={isRefreshing ? "spin-icon" : ""} />
           </button>
 
-          {/* Alert Status Bell with live badge */}
-          <div
-            className={`icon-circle-btn alert-bell-btn ${hasCritical ? "has-critical" : hasHigh ? "has-high" : "normal"}`}
-            title={
-              hasCritical
-                ? `${statistics.critical_incidents} Critical alerts active`
-                : hasHigh
-                ? `${statistics.high_incidents} High alerts active`
-                : "All systems normal"
-            }
-          >
-            <Bell size={17} />
-            <span className="alert-ping-dot" />
+          {/* Alert Status Bell with live badge and Dropdown */}
+          <div className="notif-bell-wrapper">
+            <button
+              type="button"
+              className={`icon-circle-btn alert-bell-btn ${
+                alerts.length > 0
+                  ? alerts.some((a) => a.severity === "CRITICAL" || (a.riskScore ?? 0) >= 80)
+                    ? "has-critical"
+                    : "has-high"
+                  : hasCritical
+                  ? "has-critical"
+                  : hasHigh
+                  ? "has-high"
+                  : "normal"
+              }`}
+              onClick={() => setIsNotifOpen((prev) => !prev)}
+              title={
+                alerts.length > 0
+                  ? `${alerts.length} live security alert(s) active`
+                  : hasCritical
+                  ? `${statistics.critical_incidents} Critical alerts active`
+                  : hasHigh
+                  ? `${statistics.high_incidents} High alerts active`
+                  : "Security Notifications"
+              }
+              aria-expanded={isNotifOpen}
+              aria-label="Toggle security notifications"
+            >
+              <Bell size={17} />
+              {(alerts.length > 0 || hasCritical || hasHigh) && (
+                <span className="alert-ping-dot" />
+              )}
+            </button>
+
+            <NotificationPopover
+              isOpen={isNotifOpen}
+              onClose={() => setIsNotifOpen(false)}
+              alerts={alerts}
+              onDismissAlert={onDismissAlert}
+              onDismissAllAlerts={onDismissAllAlerts}
+              onSelectIncident={onSelectIncident}
+              incidents={incidents}
+              onNavigate={onNavigate}
+            />
           </div>
 
           {/* Analyst Profile Avatar */}

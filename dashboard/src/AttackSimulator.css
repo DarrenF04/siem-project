@@ -1,297 +1,318 @@
 /* ==========================================================================
    ATTACK SIMULATOR COMPONENT STYLES
-   Enterprise Dual-Theme (Light + Dark) — Matching Reference Aesthetic
+   Minimal Enterprise SOC Layout (Dual Theme: Light + Pure Black Dark Mode)
    ========================================================================== */
 
-.simulator-panel {
+.simulator-view-container {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
-.simulator-header-row {
-  margin-bottom: 8px;
+/* Header Bar */
+.sim-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.backend-indicator {
+.sim-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sim-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-header-icon {
+  color: #ef4444;
+}
+
+.sim-main-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.sim-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* API Status Badge */
+.sim-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
+  gap: 6px;
+  padding: 4px 11px;
   border-radius: 9999px;
   font-size: 11px;
   font-weight: 600;
   border: 1px solid var(--border-subtle);
   background: var(--bg-subtle);
+  color: var(--text-secondary);
 }
 
-.backend-indicator.online {
-  border-color: var(--sev-low-border);
-  color: var(--sev-low-text);
-  background: var(--sev-low-bg);
+.sim-status-badge.online {
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.08);
 }
 
-.backend-indicator.offline {
-  border-color: var(--sev-critical-border);
-  color: var(--sev-critical-text);
-  background: var(--sev-critical-bg);
+[data-theme="dark"] .sim-status-badge.online {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(34, 197, 94, 0.12);
 }
 
-.backend-dot {
+.sim-status-badge.offline {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+[data-theme="dark"] .sim-status-badge.offline {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.sim-status-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: currentColor;
 }
 
-/* 2-Column Main Simulator Body */
-.simulator-body-grid {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 18px;
-}
-
-.sim-subcard {
-  background: var(--bg-subtle);
+/* Main 3-Step Workflow Container */
+.sim-workflow-card {
+  background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
-  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
   display: flex;
   flex-direction: column;
+  gap: 24px;
 }
 
-.sim-step-title {
+/* Step Section Block */
+.sim-section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sim-section-block:not(:last-child) {
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sim-step-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.sim-step-title h4 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Scenario Options Stack */
-.scenario-options-stack {
-  display: flex;
-  flex-direction: column;
   gap: 10px;
 }
 
-.scenario-card-btn {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  text-align: left;
-  transition: all 0.15s ease;
-  cursor: pointer;
-  width: 100%;
-}
-
-.scenario-card-btn:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-medium);
-  transform: translateY(-1px);
-}
-
-.scenario-card-btn.active {
-  background: var(--bg-card);
-  border-color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
-}
-
-.scenario-btn-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+.sim-step-number {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
   flex-shrink: 0;
 }
 
-.tone-warning {
-  background: var(--sev-medium-bg);
-  color: var(--sev-medium-text);
-  border: 1px solid var(--sev-medium-border);
+.sim-step-labels {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.tone-high {
-  background: var(--sev-high-bg);
-  color: var(--sev-high-text);
-  border: 1px solid var(--sev-high-border);
+.sim-step-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
 }
 
-.tone-critical {
-  background: var(--sev-critical-bg);
-  color: var(--sev-critical-text);
-  border: 1px solid var(--sev-critical-border);
+.sim-step-hint {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
-.tone-neutral {
+/* STEP 1: Scenarios Grid */
+.sim-scenarios-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.sim-scenario-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
   background: var(--bg-subtle);
-  color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  width: 100%;
 }
 
-.scenario-btn-content {
-  flex: 1;
-  min-width: 0;
+.sim-scenario-card:hover {
+  border-color: var(--border-medium);
+  background: var(--bg-card-hover);
 }
 
-.scenario-btn-top {
+.sim-scenario-card.selected {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.06);
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+[data-theme="dark"] .sim-scenario-card.selected {
+  border-color: #60a5fa;
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 1px #60a5fa;
+}
+
+.sim-scenario-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  width: 100%;
 }
 
-.scenario-btn-title {
+.sim-scenario-icon {
+  color: var(--text-secondary);
+}
+
+.sim-scenario-card.selected .sim-scenario-icon {
+  color: #3b82f6;
+}
+
+[data-theme="dark"] .sim-scenario-card.selected .sim-scenario-icon {
+  color: #60a5fa;
+}
+
+.sim-event-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.sim-scenario-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  line-height: 1.3;
 }
 
-.scenario-events-pill {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  background: var(--bg-subtle);
-  color: var(--text-muted);
+/* STEP 2: Configure Source Grid */
+.sim-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
-.scenario-btn-desc {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-/* Parameters Configuration Card */
-.execution-config-card {
-  justify-content: space-between;
-}
-
-.selected-preview-banner {
-  display: flex;
-  flex-direction: column;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  margin-bottom: 14px;
-}
-
-.preview-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.preview-name {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 600;
-  margin-top: 2px;
-}
-
-.form-field-group {
+.sim-input-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 14px;
 }
 
-.form-field-label {
+.sim-field-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: var(--text-secondary);
 }
 
-.input-with-icon {
+.sim-input-box {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
-.input-field-icon {
+.sim-field-icon {
   position: absolute;
   left: 12px;
   color: var(--text-muted);
   pointer-events: none;
 }
 
-.input-with-icon input {
+.sim-input-box input,
+.sim-input-box select {
   width: 100%;
-  padding: 10px 14px 10px 36px;
-  background: var(--bg-card);
+  height: 38px;
+  padding: 0 14px 0 36px;
+  background: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 13px;
-  font-family: var(--font-mono);
   color: var(--text-primary);
   outline: none;
-  transition: border-color 0.15s ease;
-}
-
-.input-with-icon input:focus {
-  border-color: var(--border-focus);
-}
-
-.input-with-icon input::placeholder {
-  color: var(--text-dim);
-}
-
-.form-field-hint {
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.sim-actions-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: auto;
-}
-
-.btn-sim-reset {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
   transition: all 0.15s ease;
 }
 
-.btn-sim-reset:hover:not(:disabled) {
-  color: var(--text-primary);
-  border-color: var(--border-medium);
+.sim-input-box input {
+  font-family: var(--font-mono);
 }
 
-.btn-sim-execute {
-  flex: 1;
+.sim-input-box input:focus,
+.sim-input-box select:focus {
+  border-color: var(--border-medium);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.sim-helper-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* STEP 3: Run Simulation Actions */
+.sim-action-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-run-simulation {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 10px 20px;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
   border-radius: 9999px;
   font-size: 13px;
   font-weight: 600;
@@ -299,141 +320,234 @@
   background: var(--btn-primary-bg);
   border: 1px solid var(--btn-primary-bg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.btn-sim-execute:hover:not(:disabled) {
+.btn-run-simulation:hover:not(:disabled) {
   background: var(--btn-primary-hover);
   transform: translateY(-1px);
 }
 
-.btn-sim-execute:disabled, .btn-sim-reset:disabled {
+.btn-run-simulation:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Simulation Output Card */
-.results-status-card {
-  margin-top: 6px;
+.btn-sim-reset-clean {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.sim-empty-result {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 14px;
+.btn-sim-reset-clean:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-medium);
   background: var(--bg-card);
+}
+
+/* Compact Result Box */
+.sim-compact-result-box {
+  margin-top: 14px;
+}
+
+.result-banner {
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-subtle);
+}
+
+.result-banner.idle {
+  background: var(--bg-subtle);
   border: 1px dashed var(--border-subtle);
 }
 
-.empty-result-icon {
-  color: var(--text-dim);
-  flex-shrink: 0;
-}
-
-.empty-result-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.empty-result-headline {
+.result-idle-text {
   font-size: 12px;
-  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.result-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.result-sub-label {
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
-/* Alert Boxes */
-.sim-alert-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  margin-bottom: 12px;
-}
-
-.sim-alert-box.alert-success {
-  background: var(--sev-low-bg);
-  border: 1px solid var(--sev-low-border);
-  color: var(--sev-low-text);
-}
-
-.sim-alert-box.alert-error {
-  background: var(--sev-critical-bg);
-  border: 1px solid var(--sev-critical-border);
-  color: var(--sev-critical-text);
-}
-
-.alert-icon {
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.alert-text-group {
-  display: flex;
-  flex-direction: column;
+.result-error-msg {
   font-size: 12px;
+  color: #ef4444;
+  font-weight: 500;
 }
 
-.alert-text-group strong {
-  font-weight: 600;
+.result-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 6px;
+  text-transform: uppercase;
 }
 
-/* Result Metrics Grid */
-.result-metrics-grid {
+.result-status-tag.status-running {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.result-status-tag.status-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .result-status-tag.status-error {
+  color: #f87171;
+}
+
+.result-status-tag.status-success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+[data-theme="dark"] .result-status-tag.status-success {
+  color: #4ade80;
+}
+
+/* Success Result Summary Row */
+.result-summary-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  align-items: center;
 }
 
-.result-metric-tile {
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+.result-metric-item {
   display: flex;
   flex-direction: column;
+  gap: 4px;
 }
 
-.tile-label {
+.result-metric-item .metric-header {
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
-  margin-bottom: 3px;
 }
 
-.tile-value {
+.metric-value-text {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.result-observe-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.result-observe-bar strong {
+.metric-value-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
+.metric-value-badge {
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ef4444;
+  letter-spacing: 0.02em;
+}
+
+[data-theme="dark"] .metric-value-badge {
+  color: #f87171;
+}
+
+/* Recent Simulations Table Card */
+.sim-history-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.sim-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.history-title-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.history-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.history-count-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sim-history-table td {
+  padding: 9px 12px;
+}
+
+.sim-hist-scenario {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Responsive Rules */
 @media (max-width: 900px) {
-  .simulator-body-grid {
+  .sim-scenarios-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sim-config-grid {
     grid-template-columns: 1fr;
   }
 
-  .result-metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .result-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .sim-scenarios-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .result-summary-row {
+    grid-template-columns: 1fr;
   }
 }

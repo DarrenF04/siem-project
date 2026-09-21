@@ -11,7 +11,6 @@ import {
   ShieldAlert,
   Terminal,
   XCircle,
-  Activity,
   Globe,
   Clock,
 } from "lucide-react";
@@ -24,36 +23,28 @@ const SCENARIOS = [
   {
     id: "brute-force",
     title: "Brute Force",
-    description: "Five sequential failed authentications from the same origin IP.",
     icon: AlertTriangle,
-    tone: "warning",
     events: 5,
     expected: "BRUTE_FORCE",
   },
   {
     id: "credential-attack",
     title: "Credential Attack",
-    description: "Multiple failed attempts followed immediately by an authenticated login.",
     icon: LockKeyhole,
-    tone: "high",
     events: 6,
     expected: "CREDENTIAL_ATTACK",
   },
   {
     id: "account-compromise",
     title: "Account Compromise",
-    description: "Failed logins → successful login → unauthorized shell command execution.",
     icon: ShieldAlert,
-    tone: "critical",
     events: 7,
     expected: "ACCOUNT_COMPROMISE",
   },
   {
     id: "command-execution",
     title: "Suspicious Command",
-    description: "Isolated suspicious shell command executed without prior auth failure.",
     icon: Terminal,
-    tone: "neutral",
     events: 1,
     expected: "SUSPICIOUS_COMMAND_EXECUTION",
   },
@@ -66,13 +57,24 @@ const ENDPOINTS = {
   "command-execution": "/simulate/command-execution",
 };
 
+const DETECTION_MAP = {
+  "account-compromise": "CRITICAL / RISK 90",
+  "ACCOUNT_COMPROMISE": "CRITICAL / RISK 90",
+  "credential-attack": "HIGH / RISK 60",
+  "CREDENTIAL_ATTACK": "HIGH / RISK 60",
+  "brute-force": "HIGH / RISK 40",
+  "BRUTE_FORCE": "HIGH / RISK 40",
+  "command-execution": "MEDIUM / RISK 25",
+  "SUSPICIOUS_COMMAND_EXECUTION": "MEDIUM / RISK 25",
+};
+
 function randomPrivateIp() {
   return `192.168.100.${Math.floor(Math.random() * 241) + 10}`;
 }
 
 export default function AttackSimulator({ onAttackSimulated, recentSimulations = [] }) {
   const [sourceIp, setSourceIp] = useState("");
-  const [geoLocation, setGeoLocation] = useState("New York, USA");
+  const [geoLocation, setGeoLocation] = useState("India");
   const [selectedScenario, setSelectedScenario] = useState("account-compromise");
   const [scenarios, setScenarios] = useState(SCENARIOS);
   const [loading, setLoading] = useState(false);
@@ -102,10 +104,17 @@ export default function AttackSimulator({ onAttackSimulated, recentSimulations =
       const data = await response.json();
       if (Array.isArray(data.scenarios) && data.scenarios.length) {
         setScenarios(
-          data.scenarios.map((item) => ({
-            ...SCENARIOS.find((scenario) => scenario.id === item.id),
-            ...item,
-          }))
+          data.scenarios.map((item) => {
+            const fallback = SCENARIOS.find((s) => s.id === item.id) || {};
+            return {
+              ...fallback,
+              id: item.id,
+              title: item.name || fallback.title || item.id,
+              events: item.events_generated ?? fallback.events ?? 5,
+              expected: item.expected_classification || fallback.expected,
+              icon: fallback.icon || AlertTriangle,
+            };
+          })
         );
       }
     } catch {
@@ -129,7 +138,13 @@ export default function AttackSimulator({ onAttackSimulated, recentSimulations =
 
     try {
       const targetIp = sourceIp.trim() || randomPrivateIp();
-      const body = { source_ip: targetIp };
+      const locData = GEO_LOCATIONS[geoLocation] || {};
+      const body = {
+        source_ip: targetIp,
+        country: locData.country || null,
+        latitude: locData.lat !== undefined ? locData.lat : null,
+        longitude: locData.lng !== undefined ? locData.lng : null,
+      };
 
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
@@ -150,18 +165,19 @@ export default function AttackSimulator({ onAttackSimulated, recentSimulations =
         ...data,
         scenarioTitle: scenario?.title || selectedScenario,
         expected: scenario?.expected || data.scenario,
-        location: geoLocation,
+        location: locData.country || "No Location",
         source_ip: targetIp,
+        events_generated: data.events_generated || scenario?.events || 5,
         timestamp: new Date().toLocaleTimeString(),
       };
 
       setResult(simulationResult);
 
-      // Notify parent to update World Threat Map and recent history
+      // Notify parent to update recent history
       if (onAttackSimulated) {
         onAttackSimulated({
           ip: targetIp,
-          location: geoLocation,
+          location: locData.country || "No Location",
           scenarioTitle: scenario?.title || selectedScenario,
           attackType: scenario?.expected || "ATTACK_VECTOR",
           events: data.events_generated || scenario?.events || 5,
@@ -182,40 +198,44 @@ export default function AttackSimulator({ onAttackSimulated, recentSimulations =
   const selected = scenarios.find((item) => item.id === selectedScenario);
 
   return (
-    <div className="card simulator-panel">
-      <div className="card-header simulator-header-row">
-        <div className="card-title-wrap">
-          <Crosshair size={18} className="card-title-icon text-red" />
-          <div>
-            <h3 style={{ margin: 0, fontSize: "16px" }}>Attack Simulator</h3>
-            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-              Inject synthetic attack patterns to test detection, correlation, and live SOC alert workflows
-            </span>
+    <div className="simulator-view-container">
+      {/* HEADER BAR */}
+      <div className="sim-panel-header">
+        <div className="sim-header-main">
+          <div className="sim-header-title-row">
+            
+            
           </div>
+          <p className="sim-subtitle">Test detection and correlation safely</p>
         </div>
 
-        <div className={`backend-indicator ${backendOnline ? "online" : "offline"}`}>
-          <span className="backend-dot" />
-          <span>{backendOnline ? "API Online" : "API Disconnected"}</span>
+        <div className={`sim-status-badge ${backendOnline ? "online" : "offline"}`}>
+          <span className="sim-status-dot" />
+          <span>{backendOnline ? "Online" : "Offline"}</span>
         </div>
       </div>
 
-      <div className="simulator-body-grid">
-        {/* Scenario Selector */}
-        <div className="sim-subcard scenario-picker-card">
-          <div className="sim-step-title">
-            <h4>Attack Scenario</h4>
+      {/* 3-STEP FLOW WORKSPACE */}
+      <div className="sim-workflow-card">
+        {/* STEP 1: CHOOSE ATTACK */}
+        <div className="sim-section-block">
+          <div className="sim-step-heading">
+            <span className="sim-step-number">1</span>
+            <div className="sim-step-labels">
+              <span className="sim-step-title">Choose Attack</span>
+              <span className="sim-step-hint">Select a threat scenario to simulate</span>
+            </div>
           </div>
 
-          <div className="scenario-options-stack">
+          <div className="sim-scenarios-grid">
             {scenarios.map((scenario) => {
               const Icon = scenario.icon || AlertTriangle;
-              const active = selectedScenario === scenario.id;
+              const isSelected = selectedScenario === scenario.id;
 
               return (
                 <button
                   key={scenario.id}
-                  className={`scenario-card-btn ${active ? "active" : ""}`}
+                  className={`sim-scenario-card ${isSelected ? "selected" : ""}`}
                   onClick={() => {
                     setSelectedScenario(scenario.id);
                     setResult(null);
@@ -223,198 +243,213 @@ export default function AttackSimulator({ onAttackSimulated, recentSimulations =
                   }}
                   type="button"
                 >
-                  <div className={`scenario-btn-icon tone-${scenario.tone || "neutral"}`}>
-                    <Icon size={18} />
+                  <div className="sim-scenario-top">
+                    <Icon size={16} className="sim-scenario-icon" />
+                    <span className="sim-event-badge">
+                      {scenario.events ?? 5} events
+                    </span>
                   </div>
-
-                  <div className="scenario-btn-content">
-                    <div className="scenario-btn-top">
-                      <span className="scenario-btn-title">{scenario.title || scenario.name}</span>
-                      <span className="scenario-events-pill">
-                        {scenario.events_generated ?? scenario.events} events
-                      </span>
-                    </div>
-                    <p className="scenario-btn-desc">
-                      {scenario.description || "Controlled SIEM simulation."}
-                    </p>
-                  </div>
+                  <span className="sim-scenario-name">{scenario.title}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Configure & Trigger */}
-        <div className="sim-subcard execution-config-card">
-          <div className="sim-step-title">
-            <h4>Attack Parameters</h4>
-          </div>
-
-          <div className="selected-preview-banner">
-            <span className="preview-label">Selected Vector</span>
-            <strong className="preview-name">{selected?.title || selected?.name}</strong>
-          </div>
-
-          {/* Source IP Input */}
-          <div className="form-field-group">
-            <label htmlFor="source-ip-input" className="form-field-label">
-              Source IP Address
-            </label>
-            <div className="input-with-icon">
-              <Network size={15} className="input-field-icon" />
-              <input
-                id="source-ip-input"
-                type="text"
-                value={sourceIp}
-                onChange={(e) => setSourceIp(e.target.value)}
-                placeholder="Auto-generate RFC1918 (e.g. 192.168.100.45)"
-                spellCheck="false"
-              />
+        {/* STEP 2: CONFIGURE SOURCE */}
+        <div className="sim-section-block">
+          <div className="sim-step-heading">
+            <span className="sim-step-number">2</span>
+            <div className="sim-step-labels">
+              <span className="sim-step-title">Configure Source</span>
+              <span className="sim-step-hint">Set origin IP and visualization target</span>
             </div>
-            <span className="form-field-hint">Leave blank to randomize IP.</span>
           </div>
 
-          {/* Geo-Location Selector (Updates World Threat Map) */}
-          <div className="form-field-group">
-            <label htmlFor="geo-location-select" className="form-field-label">
-              Geo-Location (World Map Visualization)
-            </label>
-            <div className="input-with-icon">
-              <Globe size={15} className="input-field-icon" />
-              <select
-                id="geo-location-select"
-                className="sim-geo-select-input"
-                value={geoLocation}
-                onChange={(e) => setGeoLocation(e.target.value)}
-              >
-                {Object.keys(GEO_LOCATIONS).map((locKey) => (
-                  <option key={locKey} value={locKey}>
-                    {GEO_LOCATIONS[locKey].flag} {locKey}
-                  </option>
-                ))}
-              </select>
+          <div className="sim-config-grid">
+            {/* Source IP Field */}
+            <div className="sim-input-group">
+              <label htmlFor="sim-source-ip" className="sim-field-label">
+                Source IP
+              </label>
+              <div className="sim-input-box">
+                <Network size={15} className="sim-field-icon" />
+                <input
+                  id="sim-source-ip"
+                  type="text"
+                  value={sourceIp}
+                  onChange={(e) => setSourceIp(e.target.value)}
+                  placeholder=""
+                  spellCheck="false"
+                />
+              </div>
+              <span className="sim-helper-text">
+                Leave blank to generate a private demo IP.
+              </span>
             </div>
-            <span className="form-field-hint">
-              Target coordinates will pulse on the Dashboard World Threat Map.
-            </span>
+
+            {/* Simulation Location Field */}
+            <div className="sim-input-group">
+              <label htmlFor="sim-location" className="sim-field-label">
+                Simulation Location
+              </label>
+              <div className="sim-input-box">
+                <Globe size={15} className="sim-field-icon" />
+                <select
+                  id="sim-location"
+                  value={geoLocation}
+                  onChange={(e) => setGeoLocation(e.target.value)}
+                >
+                  {Object.keys(GEO_LOCATIONS).map((locKey) => (
+                    <option key={locKey} value={locKey}>
+                      {GEO_LOCATIONS[locKey].flag} {locKey}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className="sim-helper-text">
+                Persists through SIEM pipeline to database & map.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* STEP 3: RUN SIMULATION */}
+        <div className="sim-section-block">
+          <div className="sim-step-heading">
+            <span className="sim-step-number">3</span>
+            <div className="sim-step-labels">
+              <span className="sim-step-title">Run Simulation</span>
+              <span className="sim-step-hint">Execute and inspect output</span>
+            </div>
           </div>
 
-          <div className="sim-actions-row">
+          {/* Action Row */}
+          <div className="sim-action-row">
             <button
-              className="btn-sim-reset"
-              onClick={reset}
-              disabled={loading}
-              type="button"
-            >
-              <RotateCcw size={14} />
-              <span>Reset</span>
-            </button>
-
-            <button
-              className="btn-sim-execute"
+              className="btn-run-simulation"
               onClick={runSimulation}
               disabled={loading}
               type="button"
             >
               {loading ? (
                 <>
-                  <Loader2 size={15} className="spin-icon" />
-                  <span>Simulating Vector...</span>
+                  <Loader2 size={16} className="spin-icon" />
+                  <span>Running Simulation...</span>
                 </>
               ) : (
                 <>
-                  <Play size={15} />
+                  <Play size={15} fill="currentColor" />
                   <span>Run Simulation</span>
                 </>
               )}
             </button>
+
+            <button
+              className="btn-sim-reset-clean"
+              onClick={reset}
+              disabled={loading}
+              type="button"
+              title="Reset parameters"
+            >
+              <RotateCcw size={13} />
+              <span>Reset</span>
+            </button>
+          </div>
+
+          {/* COMPACT RESULT BOX */}
+          <div className="sim-compact-result-box">
+            {loading && (
+              <div className="result-banner running">
+                <div className="result-badge-row">
+                  <span className="result-status-tag status-running">
+                    <Loader2 size={12} className="spin-icon" />
+                    RUNNING
+                  </span>
+                  <span className="result-sub-label">Transmitting telemetry events...</span>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="result-banner error">
+                <div className="result-badge-row">
+                  <span className="result-status-tag status-error">
+                    <XCircle size={13} />
+                    ERROR
+                  </span>
+                  <span className="result-error-msg">{error}</span>
+                </div>
+              </div>
+            )}
+
+            {result && !loading && !error && (
+              <div className="result-banner success">
+                <div className="result-summary-row">
+                  <div className="result-metric-item">
+                    <span className="metric-header">Status</span>
+                    <span className="result-status-tag status-success">
+                      <CheckCircle2 size={13} />
+                      SUCCESS
+                    </span>
+                  </div>
+
+                  <div className="result-metric-item">
+                    <span className="metric-header">Scenario</span>
+                    <span className="metric-value-text">{result.scenarioTitle}</span>
+                  </div>
+
+                  <div className="result-metric-item">
+                    <span className="metric-header">Source</span>
+                    <span className="metric-value-mono">{result.source_ip}</span>
+                  </div>
+
+                  <div className="result-metric-item">
+                    <span className="metric-header">Events</span>
+                    <span className="metric-value-text">{result.events_generated}</span>
+                  </div>
+
+                  <div className="result-metric-item">
+                    <span className="metric-header">Detection</span>
+                    <span className="metric-value-badge">
+                      {DETECTION_MAP[result.expected] || DETECTION_MAP[result.scenario] || "CRITICAL / RISK 90"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!result && !loading && !error && (
+              <div className="result-banner idle">
+                <span className="result-idle-text">
+                  Ready for simulation. Select an attack scenario and click Run Simulation.
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Step 3: Simulation Results Card */}
-      <div className="sim-subcard results-status-card">
-        <div className="sim-step-title">
-          <h4>Simulation Status & Output</h4>
-        </div>
-
-        {!result && !error && (
-          <div className="sim-empty-result">
-            <Activity size={18} className="empty-result-icon" />
-            <div className="empty-result-text">
-              <span className="empty-result-headline">Ready for simulation</span>
-              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                Select an attack scenario above and click Run Simulation to test log ingestion and correlation.
-              </span>
-            </div>
+      {/* RECENT SIMULATIONS TABLE (MINIMAL SOC HISTORY) */}
+      <div className="sim-history-card">
+        <div className="sim-history-header">
+          <div className="history-title-group">
+            <Clock size={14} className="text-muted" />
+            <h4 className="history-title">Recent Simulations</h4>
           </div>
-        )}
-
-        {error && (
-          <div className="sim-alert-box alert-error">
-            <XCircle size={16} className="alert-icon" />
-            <div className="alert-text-group">
-              <strong>Execution Failed</strong>
-              <span>{error}</span>
-            </div>
-          </div>
-        )}
-
-        {result && (
-          <div className="sim-result-container">
-            <div className="sim-alert-box alert-success">
-              <CheckCircle2 size={16} className="alert-icon" />
-              <div className="alert-text-group">
-                <strong>{result.message || "Attack vector simulated successfully."}</strong>
-              </div>
-            </div>
-
-            <div className="result-metrics-grid">
-              <div className="result-metric-tile">
-                <span className="tile-label">Scenario</span>
-                <span className="tile-value">{result.scenarioTitle}</span>
-              </div>
-              <div className="result-metric-tile">
-                <span className="tile-label">Origin IP</span>
-                <code className="ip-mono tile-value">{result.source_ip}</code>
-              </div>
-              <div className="result-metric-tile">
-                <span className="tile-label">Geo Location</span>
-                <span className="tile-value">{result.location}</span>
-              </div>
-              <div className="result-metric-tile">
-                <span className="tile-label">Events Generated</span>
-                <span className="tile-value">{result.events_generated}</span>
-              </div>
-            </div>
-
-            <div className="result-observe-bar">
-              <Activity size={14} className="text-green" />
-              <span>
-                Telemetry dispatched to ingestion pipeline. Correlated incident triggered on Incidents page and World Map updated on Dashboard.
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Step 4: Recent Simulations History (Matching Reference Image) */}
-      <div className="sim-subcard recent-simulations-card" style={{ marginTop: "12px" }}>
-        <div className="sim-step-title">
-          <Clock size={15} />
-          <h4>Recent Simulations</h4>
+          <span className="history-count-badge">{recentSimulations.length} total</span>
         </div>
 
         <div className="table-responsive">
-          <table className="data-table recent-sim-table">
+          <table className="modern-enterprise-table sim-history-table">
             <thead>
               <tr>
-                <th>Timestamp</th>
+                <th style={{ width: "110px" }}>Timestamp</th>
                 <th>Scenario</th>
                 <th>Source IP</th>
-                <th>Geo Location</th>
-                <th>Events</th>
-                <th style={{ textAlign: "right" }}>Status</th>
+                <th>Location</th>
+                <th style={{ width: "70px", textAlign: "right" }}>Events</th>
+                <th style={{ width: "95px", textAlign: "right" }}>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -429,15 +464,20 @@ export default function AttackSimulator({ onAttackSimulated, recentSimulations =
                   <tr key={idx}>
                     <td className="time-mono">{sim.timestamp}</td>
                     <td>
-                      <strong>{sim.scenarioTitle}</strong>
+                      <strong className="sim-hist-scenario">{sim.scenarioTitle}</strong>
                     </td>
                     <td>
-                      <code className="ip-mono">{sim.ip}</code>
+                      <code className="cell-mono">{sim.ip}</code>
                     </td>
-                    <td>{sim.location}</td>
-                    <td>{sim.events}</td>
+                    <td className="text-secondary">{sim.location}</td>
                     <td style={{ textAlign: "right" }}>
-                      <span className="badge-pill sev-low">Dispatched</span>
+                      <span className="cell-num">{sim.events}</span>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <span className="badge-pill-compact sev-low">
+                        <span className="pill-dot" />
+                        Dispatched
+                      </span>
                     </td>
                   </tr>
                 ))

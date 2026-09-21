@@ -19,6 +19,9 @@ LOG_FILE = PROJECT_DIR / "logs" / "security.log"
 
 class SimulationRequest(BaseModel):
     source_ip: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 def generate_simulation_ip() -> str:
@@ -50,23 +53,40 @@ def validate_source_ip(source_ip: str) -> str:
     return source_ip
 
 
-def write_event(source_ip: str, event_type: str, details: str):
+def write_event(
+    source_ip: str,
+    event_type: str,
+    details: str,
+    country: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+):
     """
     Write one simulated security event using the same format
     consumed by the existing SIEM log watcher.
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    geo_suffix = ""
+    if country is not None and latitude is not None and longitude is not None:
+        geo_suffix = f" | {country} | {latitude} | {longitude}"
+
     log_line = (
         f"{timestamp} | {source_ip} | Simulator | "
-        f"{event_type} | {details}\n"
+        f"{event_type} | {details}"
+        f"{geo_suffix}\n"
     )
 
     with open(LOG_FILE, "a", encoding="utf-8") as file:
         file.write(log_line)
 
 
-def run_brute_force(source_ip: str):
+def run_brute_force(
+    source_ip: str,
+    country: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+):
     """
     Generate five failed authentication attempts.
     Expected SIEM classification: BRUTE_FORCE
@@ -75,11 +95,19 @@ def run_brute_force(source_ip: str):
         write_event(
             source_ip,
             "FAILED_LOGIN",
-            f"Simulated failed authentication attempt {attempt}"
+            f"Simulated failed authentication attempt {attempt}",
+            country=country,
+            latitude=latitude,
+            longitude=longitude,
         )
 
 
-def run_credential_attack(source_ip: str):
+def run_credential_attack(
+    source_ip: str,
+    country: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+):
     """
     Generate repeated failures followed by successful authentication.
     Expected SIEM classification: CREDENTIAL_ATTACK
@@ -88,17 +116,28 @@ def run_credential_attack(source_ip: str):
         write_event(
             source_ip,
             "FAILED_LOGIN",
-            f"Simulated failed authentication attempt {attempt}"
+            f"Simulated failed authentication attempt {attempt}",
+            country=country,
+            latitude=latitude,
+            longitude=longitude,
         )
 
     write_event(
         source_ip,
         "SUCCESSFUL_LOGIN",
-        "Simulated successful authentication after repeated failures"
+        "Simulated successful authentication after repeated failures",
+        country=country,
+        latitude=latitude,
+        longitude=longitude,
     )
 
 
-def run_account_compromise(source_ip: str):
+def run_account_compromise(
+    source_ip: str,
+    country: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+):
     """
     Generate a multi-stage sequence:
     failed logins -> successful login -> command execution.
@@ -109,23 +148,37 @@ def run_account_compromise(source_ip: str):
         write_event(
             source_ip,
             "FAILED_LOGIN",
-            f"Simulated failed authentication attempt {attempt}"
+            f"Simulated failed authentication attempt {attempt}",
+            country=country,
+            latitude=latitude,
+            longitude=longitude,
         )
 
     write_event(
         source_ip,
         "SUCCESSFUL_LOGIN",
-        "Simulated successful authentication after repeated failures"
+        "Simulated successful authentication after repeated failures",
+        country=country,
+        latitude=latitude,
+        longitude=longitude,
     )
 
     write_event(
         source_ip,
         "COMMAND_EXECUTION",
-        "Simulated suspicious command execution after authentication"
+        "Simulated suspicious command execution after authentication",
+        country=country,
+        latitude=latitude,
+        longitude=longitude,
     )
 
 
-def run_command_execution(source_ip: str):
+def run_command_execution(
+    source_ip: str,
+    country: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+):
     """
     Generate a suspicious command execution event.
     Expected SIEM classification:
@@ -134,7 +187,10 @@ def run_command_execution(source_ip: str):
     write_event(
         source_ip,
         "COMMAND_EXECUTION",
-        "Simulated suspicious command execution"
+        "Simulated suspicious command execution",
+        country=country,
+        latitude=latitude,
+        longitude=longitude,
     )
 
 
@@ -154,13 +210,19 @@ def simulate_brute_force(
 
     background_tasks.add_task(
         run_brute_force,
-        source_ip
+        source_ip,
+        request.country,
+        request.latitude,
+        request.longitude,
     )
 
     return {
         "message": "Brute-force simulation started",
         "scenario": "BRUTE_FORCE",
         "source_ip": source_ip,
+        "country": request.country,
+        "latitude": request.latitude,
+        "longitude": request.longitude,
         "events_generated": 5
     }
 
@@ -174,13 +236,19 @@ def simulate_credential_attack(
 
     background_tasks.add_task(
         run_credential_attack,
-        source_ip
+        source_ip,
+        request.country,
+        request.latitude,
+        request.longitude,
     )
 
     return {
         "message": "Credential attack simulation started",
         "scenario": "CREDENTIAL_ATTACK",
         "source_ip": source_ip,
+        "country": request.country,
+        "latitude": request.latitude,
+        "longitude": request.longitude,
         "events_generated": 6
     }
 
@@ -194,13 +262,19 @@ def simulate_account_compromise(
 
     background_tasks.add_task(
         run_account_compromise,
-        source_ip
+        source_ip,
+        request.country,
+        request.latitude,
+        request.longitude,
     )
 
     return {
         "message": "Account compromise simulation started",
         "scenario": "ACCOUNT_COMPROMISE",
         "source_ip": source_ip,
+        "country": request.country,
+        "latitude": request.latitude,
+        "longitude": request.longitude,
         "events_generated": 7
     }
 
@@ -214,13 +288,19 @@ def simulate_command_execution(
 
     background_tasks.add_task(
         run_command_execution,
-        source_ip
+        source_ip,
+        request.country,
+        request.latitude,
+        request.longitude,
     )
 
     return {
         "message": "Command execution simulation started",
         "scenario": "SUSPICIOUS_COMMAND_EXECUTION",
         "source_ip": source_ip,
+        "country": request.country,
+        "latitude": request.latitude,
+        "longitude": request.longitude,
         "events_generated": 1
     }
 @router.get("/scenarios")

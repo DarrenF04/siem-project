@@ -9,10 +9,12 @@ db_file = project_dir / "database" / "siem.db"
 
 
 def get_connection():
+    db_file.parent.mkdir(parents=True, exist_ok=True)
     return sqlite3.connect(db_file)
 
 
 def create_database():
+    db_file.parent.mkdir(parents=True, exist_ok=True)
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -24,7 +26,10 @@ def create_database():
             source TEXT NOT NULL,
             event_type TEXT NOT NULL,
             details TEXT,
-            severity TEXT NOT NULL
+            severity TEXT NOT NULL,
+            country TEXT,
+            latitude REAL,
+            longitude REAL
         )
     """)
 
@@ -43,20 +48,37 @@ def create_database():
             message TEXT,
             status TEXT DEFAULT 'OPEN',
             created_at TEXT,
-            updated_at TEXT
+            updated_at TEXT,
+            country TEXT,
+            latitude REAL,
+            longitude REAL
         )
     """)
 
+    cursor.execute("PRAGMA table_info(security_events)")
+    event_columns = [column[1] for column in cursor.fetchall()]
+    event_migrations = {
+        "country": "ALTER TABLE security_events ADD COLUMN country TEXT",
+        "latitude": "ALTER TABLE security_events ADD COLUMN latitude REAL",
+        "longitude": "ALTER TABLE security_events ADD COLUMN longitude REAL",
+    }
+    for column, statement in event_migrations.items():
+        if column not in event_columns:
+            cursor.execute(statement)
+
     cursor.execute("PRAGMA table_info(security_incidents)")
-    columns = [column[1] for column in cursor.fetchall()]
-    migrations = {
+    incident_columns = [column[1] for column in cursor.fetchall()]
+    incident_migrations = {
         "attack_type": "ALTER TABLE security_incidents ADD COLUMN attack_type TEXT DEFAULT 'UNKNOWN'",
         "status": "ALTER TABLE security_incidents ADD COLUMN status TEXT DEFAULT 'OPEN'",
         "created_at": "ALTER TABLE security_incidents ADD COLUMN created_at TEXT",
         "updated_at": "ALTER TABLE security_incidents ADD COLUMN updated_at TEXT",
+        "country": "ALTER TABLE security_incidents ADD COLUMN country TEXT",
+        "latitude": "ALTER TABLE security_incidents ADD COLUMN latitude REAL",
+        "longitude": "ALTER TABLE security_incidents ADD COLUMN longitude REAL",
     }
-    for column, statement in migrations.items():
-        if column not in columns:
+    for column, statement in incident_migrations.items():
+        if column not in incident_columns:
             cursor.execute(statement)
 
     cursor.execute("""
@@ -84,11 +106,14 @@ def insert_event(event):
     cursor = connection.cursor()
     cursor.execute("""
         INSERT INTO security_events
-        (timestamp, source_ip, source, event_type, details, severity)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (timestamp, source_ip, source, event_type, details, severity, country, latitude, longitude)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         event.timestamp.isoformat(), event.source_ip, event.source,
-        event.event_type, event.details, event.severity
+        event.event_type, event.details, event.severity,
+        getattr(event, "country", None),
+        getattr(event, "latitude", None),
+        getattr(event, "longitude", None)
     ))
     connection.commit()
     connection.close()
@@ -100,25 +125,37 @@ def insert_or_update_incident(incident):
     now = datetime.now().isoformat()
 
     cursor.execute("""
-        SELECT id FROM security_incidents
+        SELECT id, country, latitude, longitude FROM security_incidents
         WHERE source_ip = ? AND status = 'OPEN'
         ORDER BY id DESC LIMIT 1
     """, (incident["source_ip"],))
     existing = cursor.fetchone()
 
+    country = incident.get("country")
+    latitude = incident.get("latitude")
+    longitude = incident.get("longitude")
+
     if existing:
         incident_id = existing[0]
+        if country is None:
+            country = existing[1]
+            latitude = existing[2]
+            longitude = existing[3]
+
         cursor.execute("""
             UPDATE security_incidents
             SET incident_type = ?, attack_type = ?, failed_logins = ?,
                 successful_login = ?, command_executions = ?, risk_score = ?,
-                severity = ?, message = ?, updated_at = ?
+                severity = ?, message = ?, updated_at = ?,
+                country = ?, latitude = ?, longitude = ?
             WHERE id = ?
         """, (
             incident["incident"], incident.get("attack_type", "UNKNOWN"),
             incident["failed_logins"], int(incident["successful_login"]),
             incident["command_executions"], incident["risk_score"],
-            incident["severity"], incident["message"], now, incident_id
+            incident["severity"], incident["message"], now,
+            country, latitude, longitude,
+            incident_id
         ))
         print(f"🔄 Existing incident #{incident_id} updated")
     else:
@@ -126,14 +163,15 @@ def insert_or_update_incident(incident):
             INSERT INTO security_incidents
             (timestamp, incident_type, attack_type, source_ip, failed_logins,
              successful_login, command_executions, risk_score, severity, message,
-             status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             status, created_at, updated_at, country, latitude, longitude)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             now, incident["incident"], incident.get("attack_type", "UNKNOWN"),
             incident["source_ip"], incident["failed_logins"],
             int(incident["successful_login"]), incident["command_executions"],
             incident["risk_score"], incident["severity"], incident["message"],
-            "OPEN", now, now
+            "OPEN", now, now,
+            country, latitude, longitude
         ))
         incident_id = cursor.lastrowid
         print(f"🆕 New incident #{incident_id} created")

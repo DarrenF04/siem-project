@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   ArrowRight,
@@ -9,6 +9,8 @@ import {
   Terminal,
   FileCode,
   ShieldCheck,
+  FileDown,
+  Loader2,
 } from "lucide-react";
 
 export default function InvestigationModal({
@@ -18,6 +20,8 @@ export default function InvestigationModal({
   events,
   getSeverityClass,
 }) {
+  const [isExporting, setIsExporting] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
@@ -29,6 +33,32 @@ export default function InvestigationModal({
   }, [onClose]);
 
   if (!selectedIncident) return null;
+
+  const handleExportPdf = async () => {
+    try {
+      setIsExporting(true);
+      const res = await fetch(`http://127.0.0.1:8000/reports/incidents/${selectedIncident.id}/pdf`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const attackType = (selectedIncident.attack_type || "INCIDENT").replace(/\s+/g, "_");
+      a.download = `SIEM_Incident_${selectedIncident.id}_${attackType}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Investigation PDF Export error:", err);
+      alert(`Export failed: ${err.message}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const attackTypeFormatted = (
     selectedIncident.attack_type || "UNKNOWN"
@@ -59,14 +89,36 @@ export default function InvestigationModal({
             <h2>{selectedIncident.incident_type}</h2>
           </div>
 
-          <button
-            className="modal-close-btn"
-            onClick={onClose}
-            aria-label="Close investigation"
-            type="button"
-          >
-            <X size={18} />
-          </button>
+          <div className="modal-header-actions">
+            <button
+              type="button"
+              className="btn-modal-export-pdf"
+              onClick={handleExportPdf}
+              disabled={isExporting}
+              title="Export Incident PDF Report"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 size={13} className="spin-icon" />
+                  <span>Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <FileDown size={13} />
+                  <span>Export PDF Report</span>
+                </>
+              )}
+            </button>
+
+            <button
+              className="modal-close-btn"
+              onClick={onClose}
+              aria-label="Close investigation"
+              type="button"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="modal-body">
@@ -100,6 +152,14 @@ export default function InvestigationModal({
               <span className="modal-metric-label">Severity</span>
               <span className={`badge-severity sev-${getSeverityClass(selectedIncident.severity)}`}>
                 {selectedIncident.severity}
+              </span>
+            </div>
+
+            {/* Reported Location */}
+            <div className="modal-metric-card">
+              <span className="modal-metric-label">Reported Location</span>
+              <span className="country-clean-text" style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+                {selectedIncident.country || "—"}
               </span>
             </div>
 

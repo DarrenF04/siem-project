@@ -2,139 +2,97 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { ChevronDown, Plus, Minus } from "lucide-react";
 import { WorldMapPaths } from "./WorldMapPaths";
 
-// Standard Miller/Robinson projection for arbitrary geo coordinates
-function geoToSvg(lat, lng) {
-  const x = 403 + (lng * (784.077 / 360));
-  const latRad = (lat * Math.PI) / 180;
-  const y = 492 - Math.sin(latRad * 0.95) * 195;
+// Continuous calibrated coordinate projection for arbitrary geo coordinates
+export function geoToSvg(lat, lng) {
+  const x = 410.0 + 2.318 * lng;
+  const y = 535.0 - 2.85 * lat;
   return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
 }
 
-// Preset geographic locations for IP telemetry mapping
+// Preset geographic locations for demonstration & simulator selection
 export const GEO_LOCATIONS = {
-  "New York, USA": {
-    lat: 40.71,
-    lng: -74.0,
-    region: "North America",
-    flag: "🇺🇸",
-    x: 205,
-    y: 425,
-    baseScale: 1.45,
-    defaultEvents: 142,
-    defaultType: "BRUTE_FORCE",
-    defaultSev: "CRITICAL",
+  "India": {
+    country: "India",
+    lat: 19.0760,
+    lng: 72.8777,
+    flag: "🇮🇳",
+    x: 585,
+    y: 480,
   },
-  "São Paulo, Brazil": {
-    lat: -23.55,
-    lng: -46.63,
-    region: "South America",
-    flag: "🇧🇷",
-    x: 305,
-    y: 580,
-    baseScale: 1.15,
-    defaultEvents: 38,
-    defaultType: "PORT_SCAN",
-    defaultSev: "HIGH",
-  },
-  "Berlin, Germany": {
-    lat: 52.52,
-    lng: 13.4,
-    region: "Europe",
+  "Germany": {
+    country: "Germany",
+    lat: 52.5200,
+    lng: 13.4050,
     flag: "🇩🇪",
     x: 430,
     y: 385,
-    baseScale: 1.35,
-    defaultEvents: 89,
-    defaultType: "CREDENTIAL_ATTACK",
-    defaultSev: "CRITICAL",
   },
-  "London, UK": {
-    lat: 51.51,
-    lng: -0.13,
-    region: "Europe",
-    flag: "🇬🇧",
-    x: 402,
-    y: 372,
-    baseScale: 1.1,
-    defaultEvents: 24,
-    defaultType: "AUTH_FAILURE",
-    defaultSev: "MEDIUM",
+  "United States": {
+    country: "United States",
+    lat: 40.7128,
+    lng: -74.0060,
+    flag: "🇺🇸",
+    x: 205,
+    y: 425,
   },
-  "Johannesburg, South Africa": {
-    lat: -26.2,
-    lng: 28.04,
-    region: "Africa",
+  "Singapore": {
+    country: "Singapore",
+    lat: 1.3521,
+    lng: 103.8198,
+    flag: "🇸🇬",
+    x: 659,
+    y: 527,
+  },
+  "Brazil": {
+    country: "Brazil",
+    lat: -23.5505,
+    lng: -46.6333,
+    flag: "🇧🇷",
+    x: 305,
+    y: 580,
+  },
+  "South Africa": {
+    country: "South Africa",
+    lat: -26.2041,
+    lng: 28.0473,
     flag: "🇿🇦",
     x: 470,
     y: 580,
-    baseScale: 1.1,
-    defaultEvents: 45,
-    defaultType: "SQL_INJECTION",
-    defaultSev: "HIGH",
   },
-  "Beijing, China": {
-    lat: 39.9,
-    lng: 116.4,
-    region: "East Asia",
-    flag: "🇨🇳",
-    x: 655,
-    y: 425,
-    baseScale: 1.25,
-    defaultEvents: 76,
-    defaultType: "ACCOUNT_COMPROMISE",
-    defaultSev: "CRITICAL",
+  "United Kingdom": {
+    country: "United Kingdom",
+    lat: 51.5074,
+    lng: -0.1278,
+    flag: "🇬🇧",
+    x: 402,
+    y: 372,
   },
-  "Tokyo, Japan": {
-    lat: 35.68,
-    lng: 139.69,
-    region: "East Asia",
+  "Japan": {
+    country: "Japan",
+    lat: 35.6762,
+    lng: 139.6503,
     flag: "🇯🇵",
     x: 710,
     y: 425,
-    baseScale: 1.05,
-    defaultEvents: 19,
-    defaultType: "PORT_SCAN",
-    defaultSev: "MEDIUM",
   },
-  "Sydney, Australia": {
-    lat: -33.87,
-    lng: 151.21,
-    region: "Oceania",
+  "Australia": {
+    country: "Australia",
+    lat: -33.8688,
+    lng: 151.2093,
     flag: "🇦🇺",
     x: 715,
     y: 625,
-    baseScale: 1.35,
-    defaultEvents: 94,
-    defaultType: "BRUTE_FORCE",
-    defaultSev: "HIGH",
   },
-  "Moscow, Russia": {
-    lat: 55.75,
-    lng: 37.62,
-    region: "Eastern Europe",
-    flag: "🇷🇺",
-    x: 485,
-    y: 360,
-    baseScale: 1.1,
-    defaultEvents: 31,
-    defaultType: "AUTH_FAILURE",
-    defaultSev: "MEDIUM",
+  "None (No Location)": {
+    country: null,
+    lat: null,
+    lng: null,
+    flag: "🚫",
   },
 };
 
-// Global primary hotspots matching the reference visual distribution
-const GLOBAL_HOTSPOT_KEYS = [
-  "New York, USA",
-  "São Paulo, Brazil",
-  "Berlin, Germany",
-  "Johannesburg, South Africa",
-  "Beijing, China",
-  "Sydney, Australia",
-];
-
 export default function WorldThreatMap({
-  sourceIps = [],
-  simulatedAttacks = [],
+  events = [],
 }) {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [timeRange, setTimeRange] = useState("Last 24 Hours");
@@ -153,98 +111,99 @@ export default function WorldThreatMap({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Compute threat nodes based on live source IPs, simulated attacks, and baseline global hubs
+  // Compute threat nodes strictly from real events that contain latitude and longitude
   const threatNodes = useMemo(() => {
-    const nodes = [];
-    const locationKeys = Object.keys(GEO_LOCATIONS);
+    const geoEvents = (events || []).filter(
+      (ev) =>
+        ev &&
+        ev.latitude !== null &&
+        ev.latitude !== undefined &&
+        ev.longitude !== null &&
+        ev.longitude !== undefined &&
+        !isNaN(Number(ev.latitude)) &&
+        !isNaN(Number(ev.longitude))
+    );
 
-    // 1. Incorporate live source IPs
-    const liveIpMap = new Map();
-    sourceIps.forEach((ipData, idx) => {
-      const locKey = locationKeys[idx % locationKeys.length];
-      liveIpMap.set(locKey, {
-        ip: ipData.name,
-        events: ipData.value || 12,
-        attackType: idx % 2 === 0 ? "BRUTE_FORCE" : "PORT_SCAN",
-        severity: idx === 0 ? "CRITICAL" : idx < 3 ? "HIGH" : "MEDIUM",
-      });
-    });
+    // Rule: NO LOCATION DATA = NO MAP MARKER
+    if (geoEvents.length === 0) {
+      return [];
+    }
 
-    // 2. Incorporate recent simulated attacks
-    const simMap = new Map();
-    simulatedAttacks.forEach((sim) => {
-      const locKey = sim.location || "New York, USA";
-      simMap.set(locKey, {
-        ip: sim.ip || "192.168.100.45",
-        events: sim.events || 5,
-        attackType: sim.attackType || "ACCOUNT_COMPROMISE",
-        severity: "CRITICAL",
-        isSimulated: true,
-      });
-    });
+    // Aggregate multiple events that report the same location cleanly
+    const groups = new Map();
+    const SEV_WEIGHT = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1, INFO: 0 };
 
-    // 3. Build nodes for the 6 primary global hotspots
-    GLOBAL_HOTSPOT_KEYS.forEach((locKey, idx) => {
-      const geo = GEO_LOCATIONS[locKey];
-      const live = liveIpMap.get(locKey);
-      const sim = simMap.get(locKey);
+    geoEvents.forEach((ev) => {
+      const lat = Number(ev.latitude);
+      const lng = Number(ev.longitude);
+      const country = ev.country || "Reported Location";
+      const key = `${country.toLowerCase()}-${lat.toFixed(3)}-${lng.toFixed(3)}`;
 
-      let events = geo.defaultEvents;
-      let attackType = geo.defaultType;
-      let severity = geo.defaultSev;
-      let ip = `192.168.${10 + idx * 5}.${45 + idx * 7}`;
-      let isSimulated = false;
-
-      if (sim) {
-        events += sim.events * 10;
-        attackType = sim.attackType;
-        severity = "CRITICAL";
-        ip = sim.ip;
-        isSimulated = true;
-      } else if (live) {
-        events = Math.max(events, live.events);
-        attackType = live.attackType;
-        severity = live.severity;
-        ip = live.ip;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          country,
+          lat,
+          lng,
+          count: 0,
+          sourceIps: new Set(),
+          attackTypes: new Set(),
+          maxSev: "INFO",
+        });
       }
 
-      const coords = { x: geo.x, y: geo.y };
+      const g = groups.get(key);
+      g.count += 1;
+      if (ev.source_ip) g.sourceIps.add(ev.source_ip);
+      if (ev.event_type) g.attackTypes.add(ev.event_type.replace(/_/g, " "));
 
-      nodes.push({
-        id: `node-${idx}-${locKey}`,
-        location: locKey,
-        region: geo.region,
-        flag: geo.flag,
-        ip,
-        events,
-        attackType,
-        severity,
-        x: coords.x,
-        y: coords.y,
-        scale: geo.baseScale * (isSimulated ? 1.2 : 1.0),
-        isSimulated,
-      });
+      const sev = (ev.severity || "INFO").toUpperCase();
+      if ((SEV_WEIGHT[sev] || 0) > (SEV_WEIGHT[g.maxSev] || 0)) {
+        g.maxSev = sev;
+      }
     });
 
-    // Optional faint companion node in Central Asia to match reference subtle sub-aura
-    nodes.push({
-      id: "node-companion-asia",
-      location: "Central Asia Node",
-      region: "Central Asia",
-      flag: "🌐",
-      ip: "10.14.88.12",
-      events: 18,
-      attackType: "NETWORK_PROBE",
-      severity: "LOW",
-      x: 605,
-      y: 435,
-      scale: 0.65,
-      isSimulated: false,
-      isSecondary: true,
+    const nodes = [];
+    let idx = 0;
+
+    groups.forEach((g) => {
+      const preset = Object.values(GEO_LOCATIONS).find(
+        (loc) => loc.country && loc.country.toLowerCase() === g.country.toLowerCase()
+      );
+
+      let x, y, flag;
+      if (preset && preset.x && preset.y) {
+        x = preset.x;
+        y = preset.y;
+        flag = preset.flag;
+      } else {
+        const projected = geoToSvg(g.lat, g.lng);
+        x = projected.x;
+        y = projected.y;
+        flag = preset?.flag || "📍";
+      }
+
+      const scale = Math.min(1.5, 1.0 + (g.count / 20) * 0.4);
+      const primaryAttack = Array.from(g.attackTypes).join(", ") || "SECURITY EVENT";
+
+      nodes.push({
+        id: `node-${idx++}-${g.key}`,
+        country: g.country,
+        flag,
+        lat: g.lat,
+        lng: g.lng,
+        x,
+        y,
+        events: g.count,
+        sourceIps: Array.from(g.sourceIps),
+        severity: g.maxSev,
+        attackType: primaryAttack,
+        scale,
+      });
     });
 
     return nodes;
-  }, [sourceIps, simulatedAttacks]);
+  }, [events]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(2.0, Math.round((prev + 0.25) * 100) / 100));
@@ -262,13 +221,34 @@ export default function WorldThreatMap({
     "All Time",
   ];
 
+  // Smart tooltip positioning: flips below northern hotspots so it never goes off the top
+  const tooltipPosition = useMemo(() => {
+    if (!hoveredNode) return null;
+
+    const zoomedX = 422 + (hoveredNode.x - 422) * zoom;
+    const zoomedY = 470 + (hoveredNode.y - 470) * zoom;
+
+    const leftPct = Math.max(16, Math.min(84, ((zoomedX - 30.767) / 784.077) * 100));
+    const topPct = ((zoomedY - 241.591) / 458.627) * 100;
+    const isBelow = topPct < 52;
+
+    return {
+      left: `${leftPct}%`,
+      top: `${topPct}%`,
+      transform: isBelow
+        ? "translate(-50%, 28px)"
+        : "translate(-50%, calc(-100% - 28px))",
+      isBelow,
+    };
+  }, [hoveredNode, zoom]);
+
   return (
     <div className="reference-analytic-card world-threat-map-card">
-      {/* Header matching Reference Image */}
+      {/* Header with Truthful Labeling */}
       <div className="card-inner-top map-header-row">
         <div className="map-title-block">
           <h3 className="map-title-text">Global Threat Map</h3>
-          <p className="map-subtitle-text">Live attack activity by source location</p>
+          <p className="map-subtitle-text">Attack Activity by Reported Source Location</p>
         </div>
 
         {/* Pill Dropdown: Last 24 Hours */}
@@ -319,52 +299,57 @@ export default function WorldThreatMap({
               transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
           >
-            {/* High-Fidelity World Continents with Country Borders */}
+            {/* Continents and Country Outlines */}
             <WorldMapPaths />
 
-            {/* Coral-Red Threat Hotspots with Layered Halos */}
+            {/* Truthful Data-Driven Hotspots with Breathing Effect */}
             <g className="threat-hotspots-layer">
-              {threatNodes.map((node) => {
+              {threatNodes.map((node, index) => {
                 const isHovered = hoveredNode?.id === node.id;
                 const scale = node.scale || 1.0;
 
-                // Fixed radii matching reference proportions without position shifting
-                const r3 = 34 * scale; // outermost faint halo
-                const r2 = 21 * scale; // middle translucent ring
-                const r1 = 12 * scale; // inner aura
-                const r0 = 5.5 * scale; // solid core dot
+                const r3 = 34 * scale;
+                const r2 = 21 * scale;
+                const r1 = 12 * scale;
+                const r0 = 5.5 * scale;
+
+                const breatheDelay = `${((index * 0.55) % 3.2).toFixed(2)}s`;
+                const breatheStyle = { animationDelay: breatheDelay };
 
                 return (
                   <g
                     key={node.id}
-                    className={`threat-hotspot-group ${isHovered ? "is-hovered" : ""} ${node.isSecondary ? "is-secondary" : ""}`}
+                    className={`threat-hotspot-group ${isHovered ? "is-hovered" : ""}`}
                     transform={`translate(${node.x}, ${node.y})`}
                     onMouseEnter={() => setHoveredNode(node)}
                     onMouseLeave={() => setHoveredNode(null)}
                     style={{ cursor: "pointer" }}
                   >
-                    {/* 1. Outermost Faint Halo (rgba coral red ~12%) */}
+                    {/* 1. Outermost Faint Halo */}
                     <circle
                       r={r3}
                       className="threat-aura-outer"
                       fill="#ff5a52"
-                      fillOpacity={node.isSecondary ? 0.08 : 0.14}
+                      fillOpacity={0.14}
+                      style={breatheStyle}
                     />
 
-                    {/* 2. Middle Translucent Ring (~26%) */}
+                    {/* 2. Middle Translucent Ring */}
                     <circle
                       r={r2}
                       className="threat-aura-mid"
                       fill="#ff5a52"
-                      fillOpacity={node.isSecondary ? 0.15 : 0.28}
+                      fillOpacity={0.28}
+                      style={breatheStyle}
                     />
 
-                    {/* 3. Inner Aura (~45%) */}
+                    {/* 3. Inner Aura */}
                     <circle
                       r={r1}
                       className="threat-aura-inner"
                       fill="#ff5a52"
-                      fillOpacity={node.isSecondary ? 0.25 : 0.46}
+                      fillOpacity={0.46}
+                      style={breatheStyle}
                     />
 
                     {/* 4. Solid Center Dot */}
@@ -372,6 +357,7 @@ export default function WorldThreatMap({
                       r={r0}
                       className="threat-aura-core"
                       fill="#ff5a52"
+                      style={breatheStyle}
                     />
                   </g>
                 );
@@ -405,28 +391,32 @@ export default function WorldThreatMap({
           </button>
         </div>
 
-        {/* Hover Tooltip Overlay */}
-        {hoveredNode && (
+        {/* Hover Tooltip Overlay (Displaying Real Telemetry) */}
+        {hoveredNode && tooltipPosition && (
           <div
-            className="map-node-tooltip"
+            className={`map-node-tooltip ${tooltipPosition.isBelow ? "pos-below" : "pos-above"}`}
             style={{
-              left: `${((hoveredNode.x - 30.767) / 784.077) * 100}%`,
-              top: `${((hoveredNode.y - 241.591) / 458.627) * 100}%`,
+              left: tooltipPosition.left,
+              top: tooltipPosition.top,
+              transform: tooltipPosition.transform,
             }}
           >
             <div className="tooltip-node-header">
               <span className="tooltip-flag">{hoveredNode.flag}</span>
-              <strong>{hoveredNode.location}</strong>
+              <strong>{hoveredNode.country}</strong>
             </div>
-            <div className="tooltip-node-ip ip-mono">{hoveredNode.ip}</div>
+            <div className="tooltip-node-ip ip-mono">
+              Source IP: {hoveredNode.sourceIps.join(", ") || "—"}
+            </div>
             <div className="tooltip-node-meta">
-              <span className={`badge-pill sev-${hoveredNode.severity.toLowerCase()}`}>
+              <span className={`badge-pill-compact sev-${hoveredNode.severity.toLowerCase()}`}>
+                <span className="pill-dot" />
                 {hoveredNode.severity}
               </span>
-              <span className="tooltip-attack">{hoveredNode.attackType.replace(/_/g, " ")}</span>
+              <span className="tooltip-attack">{hoveredNode.attackType}</span>
             </div>
             <div className="tooltip-node-events">
-              <strong>{hoveredNode.events}</strong> security events detected
+              <strong>{hoveredNode.events}</strong> security event{hoveredNode.events !== 1 ? "s" : ""}
             </div>
           </div>
         )}

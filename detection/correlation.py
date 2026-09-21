@@ -7,9 +7,17 @@ class CorrelationEngine:
         self.failed_logins = defaultdict(int)
         self.successful_logins = defaultdict(bool)
         self.command_executions = defaultdict(int)
+        self.geo_metadata = {}
 
     def process_event(self, event):
         ip = event.source_ip
+
+        if getattr(event, "country", None) is not None and getattr(event, "latitude", None) is not None:
+            self.geo_metadata[ip] = {
+                "country": event.country,
+                "latitude": event.latitude,
+                "longitude": event.longitude,
+            }
 
         if event.event_type == "FAILED_LOGIN":
             self.failed_logins[ip] += 1
@@ -37,6 +45,10 @@ class CorrelationEngine:
             risk_score += 30
 
         attack_type = classify_attack(failed, successful, commands)
+        geo = self.geo_metadata.get(ip, {})
+        country = geo.get("country")
+        latitude = geo.get("latitude")
+        longitude = geo.get("longitude")
 
         if risk_score >= 90:
             return {
@@ -48,7 +60,10 @@ class CorrelationEngine:
                 "command_executions": commands,
                 "risk_score": risk_score,
                 "severity": "CRITICAL",
-                "message": "Five or more failed logins followed by successful authentication and command execution"
+                "message": "Five or more failed logins followed by successful authentication and command execution",
+                "country": country,
+                "latitude": latitude,
+                "longitude": longitude,
             }
         elif risk_score >= 40:
             return {
@@ -60,6 +75,9 @@ class CorrelationEngine:
                 "command_executions": commands,
                 "risk_score": risk_score,
                 "severity": "HIGH",
-                "message": "Multiple failed login attempts detected from the same source IP"
+                "message": "Multiple failed login attempts detected from the same source IP",
+                "country": country,
+                "latitude": latitude,
+                "longitude": longitude,
             }
         return None

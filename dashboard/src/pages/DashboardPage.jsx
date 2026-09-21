@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import StatCards from "../components/StatCards";
 import EngineStatus from "../components/EngineStatus";
 import WorldThreatMap from "../components/WorldThreatMap";
+import LiveSecurityAlert from "../components/LiveSecurityAlert";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { ChevronDown, ShieldAlert } from "lucide-react";
 
@@ -24,12 +25,15 @@ const DonutTooltip = ({ active, payload, theme }) => {
 };
 
 export default function DashboardPage({
+  events = [],
   statistics,
   severityData = [],
-  eventTypeData = [],
-  sourceIpData = [],
   simulatedAttacks = [],
   theme = "light",
+  alerts = [],
+  onDismissAlert,
+  onDismissAllAlerts,
+  onSelectIncident,
 }) {
   const [metricMode, setMetricMode] = useState("count"); // 'count' | 'percent'
   const isLight = theme === "light";
@@ -53,47 +57,56 @@ export default function DashboardPage({
   // Colors
   const pieStroke = isLight ? "#ffffff" : "#151720";
 
-  // Data for Top Source IPs (with baseline fallback matching reference)
-  const baselineSourceIps = [
-    { name: "192.168.100.50", value: 72 },
-    { name: "192.168.1.50", value: 58 },
-    { name: "10.0.0.230", value: 21 },
-    { name: "192.168.100.93", value: 12 },
-    { name: "192.168.100.52", value: 4 },
-    { name: "10.0.0.231", value: 2 },
-  ];
+  // 1. TOP SOURCE IPS (Calculated dynamically from real events)
+  const topSourceIps = useMemo(() => {
+    if (!events || events.length === 0) return [];
+    const counts = {};
+    events.forEach((event) => {
+      const ip = event.source_ip;
+      if (ip) {
+        counts[ip] = (counts[ip] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .map(([ip, count]) => ({ ip, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [events]);
 
-  const displaySourceIps =
-    sourceIpData && sourceIpData.length >= 2
-      ? [...sourceIpData].sort((a, b) => b.value - a.value).slice(0, 6)
-      : baselineSourceIps;
+  const maxSourceIpCount = topSourceIps.length > 0 ? topSourceIps[0].count : 1;
 
-  const maxSourceIpValue = Math.max(
-    ...displaySourceIps.map((item) => item.value),
-    1
-  );
+  // 2. EVENT TYPES (Calculated dynamically from real events)
+  const topEventTypes = useMemo(() => {
+    if (!events || events.length === 0) return [];
+    const counts = {};
+    events.forEach((event) => {
+      const type = event.event_type;
+      if (type) {
+        counts[type] = (counts[type] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [events]);
 
-  // Data for Event Types (with baseline fallback matching reference)
-  const baselineEventTypes = [
-    { name: "FAILED_LOGIN", value: 98 },
-    { name: "COMMAND_EXECUTION", value: 32 },
-    { name: "SUCCESSFUL_LOGIN", value: 18 },
-    { name: "FILE_ACCESS", value: 6 },
-    { name: "PRIVILEGE_ESCALATION", value: 4 },
-  ];
+  const maxEventTypeCount = topEventTypes.length > 0 ? topEventTypes[0].count : 1;
 
-  const displayEventTypes =
-    eventTypeData && eventTypeData.length >= 2
-      ? [...eventTypeData].sort((a, b) => b.value - a.value).slice(0, 6)
-      : baselineEventTypes;
-
-  const maxEventTypeValue = Math.max(
-    ...displayEventTypes.map((item) => item.value),
-    1
-  );
+  // Map representation of source IPs for World Threat Map
+  const mapSourceIps = useMemo(() => {
+    return topSourceIps.map((item) => ({ name: item.ip, value: item.count }));
+  }, [topSourceIps]);
 
   return (
     <div className="dashboard-page-view">
+      {/* 0. LIVE SECURITY ALERT NOTIFICATION (IN-APP PROMINENT BANNER / STACK) */}
+      <LiveSecurityAlert
+        alerts={alerts}
+        onDismissAlert={onDismissAlert}
+        onDismissAll={onDismissAllAlerts}
+        onSelectIncident={onSelectIncident}
+      />
+
       {/* 1. TOP KPI TELEMETRY METRICS */}
       <StatCards statistics={statistics} />
 
@@ -102,11 +115,9 @@ export default function DashboardPage({
 
       {/* 3. VISUAL ANALYTICS ROW 1: WORLD THREAT MAP + INCIDENT SEVERITY DONUT */}
       <div className="analytics-double-grid">
-        {/* World Threat Map with Live & Simulated Coordinates */}
+        {/* World Threat Map with Truthful Telemetry Coordinates */}
         <WorldThreatMap
-          sourceIps={displaySourceIps}
-          simulatedAttacks={simulatedAttacks}
-          theme={theme}
+          events={events}
         />
 
         {/* Incident Severity Donut Card (Prominently Included) */}
@@ -138,8 +149,7 @@ export default function DashboardPage({
             <div className="floating-segment-badge">
               <span className="badge-bullet-pink" />
               <span>
-                {criticalCount > 0 ? criticalCount : 14} Critical (
-                {criticalPct > 0 ? criticalPct : 42}%)
+                {criticalCount} Critical ({criticalPct}%)
               </span>
             </div>
 
@@ -167,7 +177,7 @@ export default function DashboardPage({
               </ResponsiveContainer>
               <div className="donut-core-label">
                 <span className="donut-core-number">
-                  {totalSeverityCount > 0 ? totalSeverityCount : 33}
+                  {totalSeverityCount}
                 </span>
                 <span className="donut-core-sub">incidents</span>
               </div>
@@ -208,7 +218,7 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* 4. VISUAL ANALYTICS ROW 2: TOP SOURCE IPS & EVENT TYPES (Exact reference image) */}
+      {/* 4. VISUAL ANALYTICS ROW 2: TOP SOURCE IPS & EVENT TYPES (100% Dynamic Telemetry) */}
       <div className="breakdown-double-grid">
         {/* Top Source IPs Card (Coral horizontal bars) */}
         <div className="breakdown-card">
@@ -221,21 +231,25 @@ export default function DashboardPage({
           </div>
 
           <div className="breakdown-list">
-            {displaySourceIps.map((item) => {
-              const pct = Math.max(3, Math.round((item.value / maxSourceIpValue) * 100));
-              return (
-                <div className="breakdown-row" key={item.name}>
-                  <span className="breakdown-label source-ip-label">{item.name}</span>
-                  <div className="breakdown-bar-track">
-                    <div
-                      className="breakdown-bar-fill breakdown-bar-coral"
-                      style={{ width: `${pct}%` }}
-                    />
+            {topSourceIps.length === 0 ? (
+              <div className="breakdown-empty-state">No source activity</div>
+            ) : (
+              topSourceIps.map((item) => {
+                const pct = (item.count / maxSourceIpCount) * 100;
+                return (
+                  <div className="breakdown-row" key={item.ip}>
+                    <span className="breakdown-label source-ip-label">{item.ip}</span>
+                    <div className="breakdown-bar-track">
+                      <div
+                        className="breakdown-bar-fill breakdown-bar-coral"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="breakdown-value">{item.count}</span>
                   </div>
-                  <span className="breakdown-value">{item.value}</span>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -250,21 +264,25 @@ export default function DashboardPage({
           </div>
 
           <div className="breakdown-list">
-            {displayEventTypes.map((item) => {
-              const pct = Math.max(3, Math.round((item.value / maxEventTypeValue) * 100));
-              return (
-                <div className="breakdown-row" key={item.name}>
-                  <span className="breakdown-label event-type-label">{item.name}</span>
-                  <div className="breakdown-bar-track">
-                    <div
-                      className="breakdown-bar-fill breakdown-bar-indigo"
-                      style={{ width: `${pct}%` }}
-                    />
+            {topEventTypes.length === 0 ? (
+              <div className="breakdown-empty-state">No event activity</div>
+            ) : (
+              topEventTypes.map((item) => {
+                const pct = (item.count / maxEventTypeCount) * 100;
+                return (
+                  <div className="breakdown-row" key={item.type}>
+                    <span className="breakdown-label event-type-label">{item.type}</span>
+                    <div className="breakdown-bar-track">
+                      <div
+                        className="breakdown-bar-fill breakdown-bar-indigo"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="breakdown-value">{item.count}</span>
                   </div>
-                  <span className="breakdown-value">{item.value}</span>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

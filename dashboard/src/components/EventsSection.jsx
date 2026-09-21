@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, ScrollText, X, ChevronRight, Eye } from "lucide-react";
+import { Search, ScrollText, X } from "lucide-react";
 
 export default function EventsSection({
   events,
@@ -18,7 +18,6 @@ export default function EventsSection({
   getSeverityClass,
 }) {
   const [displayLimit, setDisplayLimit] = useState(15);
-  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const isFiltered =
     eventSearch !== "" ||
@@ -37,7 +36,6 @@ export default function EventsSection({
 
   const formatTimestamp = (ts) => {
     if (!ts) return "-";
-    // If ISO string like 2025-02-15T18:05:11
     const parts = ts.split("T");
     if (parts.length === 2) {
       const timePart = parts[1].slice(0, 8);
@@ -139,24 +137,25 @@ export default function EventsSection({
         </div>
       </div>
 
-      {/* MINIMAL ENTERPRISE EVENTS TABLE */}
+      {/* MINIMAL ENTERPRISE RAW TELEMETRY TABLE */}
       <div className="table-responsive">
         <table className="modern-enterprise-table events-table">
           <thead>
             <tr>
-              <th style={{ width: "170px" }}>Time</th>
-              <th>Event</th>
-              <th style={{ width: "160px" }}>Source IP</th>
-              <th style={{ width: "140px" }}>Source</th>
-              <th style={{ width: "110px" }}>Severity</th>
-              <th style={{ width: "80px", textAlign: "right" }}>Action</th>
+              <th style={{ width: "150px" }}>Time</th>
+              <th style={{ width: "170px" }}>Event</th>
+              <th>Details</th>
+              <th style={{ width: "140px" }}>Source IP</th>
+              <th style={{ width: "120px" }}>Country</th>
+              <th style={{ width: "110px" }}>Source</th>
+              <th style={{ width: "100px" }}>Severity</th>
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="empty-cell">
+                <td colSpan="7" className="empty-cell">
                   <div className="empty-message-wrap">
                     <span className="loading-spinner" />
                     <span>Loading security events stream...</span>
@@ -165,7 +164,7 @@ export default function EventsSection({
               </tr>
             ) : events.length === 0 ? (
               <tr>
-                <td colSpan="6" className="empty-cell">
+                <td colSpan="7" className="empty-cell">
                   <div className="empty-message-wrap">
                     <ScrollText size={18} className="empty-state-icon text-muted" />
                     <span className="empty-title">No events recorded</span>
@@ -174,7 +173,7 @@ export default function EventsSection({
               </tr>
             ) : filteredEvents.length === 0 ? (
               <tr>
-                <td colSpan="6" className="empty-cell">
+                <td colSpan="7" className="empty-cell">
                   <div className="empty-message-wrap">
                     <Search size={20} className="empty-state-icon text-muted" />
                     <span className="empty-title">No matching events found</span>
@@ -189,13 +188,7 @@ export default function EventsSection({
                 const sevKey = getSeverityClass(event.severity);
 
                 return (
-                  <tr
-                    key={event.id}
-                    className="modern-table-row"
-                    onClick={() => setSelectedEvent(event)}
-                    tabIndex={0}
-                    title="Click to view full event details"
-                  >
+                  <tr key={event.id} className="modern-table-row">
                     <td>
                       <span className="row-time-text">{formatTimestamp(event.timestamp)}</span>
                     </td>
@@ -205,7 +198,17 @@ export default function EventsSection({
                     </td>
 
                     <td>
+                      <span className="event-details-text" title={event.details}>
+                        {event.details || "—"}
+                      </span>
+                    </td>
+
+                    <td>
                       <span className="ip-mono-clean">{event.source_ip}</span>
+                    </td>
+
+                    <td>
+                      <span className="country-clean-text">{event.country || "—"}</span>
                     </td>
 
                     <td>
@@ -217,21 +220,6 @@ export default function EventsSection({
                         <span className="pill-dot" />
                         {event.severity}
                       </span>
-                    </td>
-
-                    <td style={{ textAlign: "right" }}>
-                      <button
-                        type="button"
-                        className="btn-action-view"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedEvent(event);
-                        }}
-                        title="View event payload details"
-                      >
-                        <span>View</span>
-                        <ChevronRight size={13} />
-                      </button>
                     </td>
                   </tr>
                 );
@@ -265,78 +253,6 @@ export default function EventsSection({
             >
               All
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* EVENT DETAILS MODAL (ACCESSIBLE ON ROW CLICK) */}
-      {selectedEvent && (
-        <div className="modal-backdrop" onClick={() => setSelectedEvent(null)}>
-          <div
-            className="modal-window event-detail-modal"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="modal-header">
-              <div className="modal-header-info">
-                <span className="modal-category">Event Telemetry Inspector</span>
-                <h3 className="modal-title">{selectedEvent.event_type}</h3>
-              </div>
-              <button
-                className="modal-close-action"
-                onClick={() => setSelectedEvent(null)}
-                type="button"
-                aria-label="Close modal"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="modal-body-content">
-              <div className="event-meta-grid">
-                <div className="event-meta-item">
-                  <span className="meta-label">Event ID</span>
-                  <span className="meta-val-mono">#{selectedEvent.id}</span>
-                </div>
-                <div className="event-meta-item">
-                  <span className="meta-label">Timestamp</span>
-                  <span className="meta-val-mono">{selectedEvent.timestamp || "-"}</span>
-                </div>
-                <div className="event-meta-item">
-                  <span className="meta-label">Source IP</span>
-                  <span className="meta-val-mono">{selectedEvent.source_ip}</span>
-                </div>
-                <div className="event-meta-item">
-                  <span className="meta-label">Origin Subsystem</span>
-                  <span className="meta-val-text">{selectedEvent.source || "Unknown"}</span>
-                </div>
-                <div className="event-meta-item">
-                  <span className="meta-label">Severity</span>
-                  <span className={`badge-pill-compact sev-${getSeverityClass(selectedEvent.severity)}`}>
-                    <span className="pill-dot" />
-                    {selectedEvent.severity}
-                  </span>
-                </div>
-              </div>
-
-              <div className="event-payload-box">
-                <span className="meta-label">Raw Log Message / Details</span>
-                <pre className="event-payload-code">
-                  {selectedEvent.details || "No raw payload details provided."}
-                </pre>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setSelectedEvent(null)}
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}

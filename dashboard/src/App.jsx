@@ -3,9 +3,9 @@ import Header from "./components/Header";
 import DashboardPage from "./pages/DashboardPage";
 import IncidentsPage from "./pages/IncidentsPage";
 import EventsPage from "./pages/EventsPage";
-import SourcesPage from "./pages/SourcesPage";
 import AttackSimulator from "./AttackSimulator";
 import InvestigationModal from "./components/InvestigationModal";
+import { useLiveAlerts } from "./hooks/useLiveAlerts";
 
 import "./App.css";
 
@@ -43,11 +43,11 @@ function App() {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
-  // Dedicated Page Routing (dashboard, incidents, events, sources, simulator)
+  // Dedicated Page Routing (dashboard, incidents, events, simulator)
   const [activePage, setActivePage] = useState(() => {
     try {
       const hash = window.location.hash.replace("#/", "").replace("#", "");
-      const validPages = ["dashboard", "incidents", "events", "sources", "simulator"];
+      const validPages = ["dashboard", "incidents", "events", "simulator"];
       return validPages.includes(hash) ? hash : "dashboard";
     } catch {
       return "dashboard";
@@ -58,7 +58,7 @@ function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace("#/", "").replace("#", "");
-      const validPages = ["dashboard", "incidents", "events", "sources", "simulator"];
+      const validPages = ["dashboard", "incidents", "events", "simulator"];
       if (validPages.includes(hash)) {
         setActivePage(hash);
       }
@@ -74,7 +74,7 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Simulated attacks state with geo-coordinates for World Threat Map
+  // Simulated attacks state for recent simulator history
   const [simulatedAttacks, setSimulatedAttacks] = useState(() => {
     try {
       const saved = localStorage.getItem("siem-simulated-attacks");
@@ -82,16 +82,7 @@ function App() {
     } catch {
       // Fallback
     }
-    return [
-      {
-        ip: "192.168.100.45",
-        location: "New York, USA",
-        scenarioTitle: "Account Compromise",
-        attackType: "ACCOUNT_COMPROMISE",
-        events: 7,
-        timestamp: "Initial Seed",
-      },
-    ];
+    return [];
   });
 
   const handleAttackSimulated = (newAttack) => {
@@ -126,6 +117,9 @@ function App() {
 
   // Selected incident for investigation modal
   const [selectedIncident, setSelectedIncident] = useState(null);
+
+  // Live security alert notification system
+  const { alerts, dismissAlert, dismissAllAlerts } = useLiveAlerts(incidents, loading);
 
   // Event derived filters
   const eventTypes = [
@@ -345,6 +339,11 @@ function App() {
         onToggleTheme={toggleTheme}
         activePage={activePage}
         onNavigate={handleNavigate}
+        alerts={alerts}
+        onDismissAlert={dismissAlert}
+        onDismissAllAlerts={dismissAllAlerts}
+        onSelectIncident={setSelectedIncident}
+        incidents={incidents}
       />
 
       {/* MAIN DEDICATED PAGE WORKSPACE */}
@@ -352,12 +351,15 @@ function App() {
         {/* 1. DASHBOARD PAGE (CHARTS ONLY — NO TABLES) */}
         {activePage === "dashboard" && (
           <DashboardPage
+            events={events}
             statistics={statistics}
             severityData={severityData}
-            eventTypeData={eventTypeData}
-            sourceIpData={sourceIpData}
             simulatedAttacks={simulatedAttacks}
             theme={theme}
+            alerts={alerts}
+            onDismissAlert={dismissAlert}
+            onDismissAllAlerts={dismissAllAlerts}
+            onSelectIncident={setSelectedIncident}
           />
         )}
 
@@ -403,18 +405,7 @@ function App() {
           />
         )}
 
-        {/* 4. SOURCES PAGE (DEDICATED) */}
-        {activePage === "sources" && (
-          <SourcesPage
-            events={events}
-            incidents={incidents}
-            sourceIpData={sourceIpData}
-            onSelectIncident={setSelectedIncident}
-            theme={theme}
-          />
-        )}
-
-        {/* 5. ATTACK SIMULATOR PAGE (DEDICATED) */}
+        {/* 4. ATTACK SIMULATOR PAGE (DEDICATED) */}
         {activePage === "simulator" && (
           <AttackSimulator
             onAttackSimulated={handleAttackSimulated}

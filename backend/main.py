@@ -1,13 +1,23 @@
 import sqlite3
+from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from database.db import create_database
 from backend.simulator import router as simulator_router
+from backend.report_generator import generate_incident_pdf, get_related_events_for_incident
 
 project_dir = Path(__file__).resolve().parent.parent
 db_file = project_dir / "database" / "siem.db"
 
-app = FastAPI(title="SIEM Backend", version="1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_database()
+    yield
+
+
+app = FastAPI(title="SIEM Backend", version="1.0", lifespan=lifespan)
 app.include_router(simulator_router)
 
 app.add_middleware(
@@ -20,6 +30,7 @@ app.add_middleware(
 
 
 def query_all(sql, params=()):
+    db_file.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(db_file)
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
@@ -134,3 +145,43 @@ def update_incident_status(incident_id: int, status: str):
     connection.commit()
     connection.close()
     return {"message": "Incident status updated", "incident_id": incident_id, "status": status}
+
+
+@app.get("/reports/incidents/{incident_id}/pdf")
+def export_incident_pdf(incident_id: int):
+    """
+    Generate and stream an audit-ready factual SIEM Incident Report PDF.
+    Retrieves incident and related events from SQLite within the correlation window.
+    """
+    connection = sqlite3.connect(db_file)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT * FROM security_incidents WHERE id = ?", (incident_id,))
+    row = cursor.fetchone()
+    if not row:
+        connection.close()
+        raise HTTPException(status_code=404, detail=f"Incident #{incident_id} not found in SIEM database")
+
+    incident = dict(row)
+    related_events = get_related_events_for_incident(connection, incident)
+    connection.close()
+
+    try:
+        pdf_bytes = generate_incident_pdf(incident, related_events)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate incident PDF report: {str(e)}")
+
+    attack_type = incident.get("attack_type") or "INCIDENT"
+    filename = f"SIEM_Incident_{incident_id}_{attack_type}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+

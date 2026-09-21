@@ -1,5 +1,14 @@
+import sys
 import time
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 from ingestion.parser import parse_log_line
 from database.db import insert_event, insert_or_update_incident
 from detection.correlation import CorrelationEngine
@@ -12,18 +21,23 @@ def watch_log():
     print("🟢 SIEM Log Watcher Started")
     print(f"Watching: {log_file}")
     print("Waiting for new security events...\n")
+
+
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    log_file.touch(exist_ok=True)
+
     position = log_file.stat().st_size
     correlation_engine = CorrelationEngine()
 
     while True:
-        with open(log_file, "r") as file:
+        with open(log_file, "r", encoding="utf-8") as file:
             file.seek(position)
             new_lines = file.readlines()
             position = file.tell()
 
         for line in new_lines:
             line = line.strip()
-            if not line:
+            if not line:    
                 continue
 
             event = parse_log_line(line)
@@ -38,6 +52,9 @@ def watch_log():
                 print("Incident:", incident["incident"])
                 print("Attack Type:", incident["attack_type"])
                 print("Source IP:", incident["source_ip"])
+                print("Country:", incident.get("country"))
+                print("Latitude:", incident.get("latitude"))
+                print("Longitude:", incident.get("longitude"))
                 print("Failed Logins:", incident["failed_logins"])
                 print("Successful Login:", incident["successful_login"])
                 print("Commands Executed:", incident["command_executions"])

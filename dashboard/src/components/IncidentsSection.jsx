@@ -1,9 +1,12 @@
+import { useState } from "react";
 import {
   Search,
   AlertTriangle,
   X,
   ChevronRight,
   SlidersHorizontal,
+  FileDown,
+  Loader2,
 } from "lucide-react";
 
 export default function IncidentsSection({
@@ -22,6 +25,9 @@ export default function IncidentsSection({
   loading,
   getSeverityClass,
 }) {
+  const [exportingId, setExportingId] = useState(null);
+  const [exportError, setExportError] = useState(null);
+
   const isFiltered =
     incidentSearch !== "" ||
     incidentSeverity !== "ALL" ||
@@ -33,6 +39,35 @@ export default function IncidentsSection({
     setIncidentSeverity("ALL");
     setIncidentStatus("ALL");
     setIncidentAttackType("ALL");
+  };
+
+  const handleExportPdf = async (e, incident) => {
+    e.stopPropagation();
+    try {
+      setExportingId(incident.id);
+      setExportError(null);
+      const res = await fetch(`http://127.0.0.1:8000/reports/incidents/${incident.id}/pdf`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const attackType = (incident.attack_type || "INCIDENT").replace(/\s+/g, "_");
+      a.download = `SIEM_Incident_${incident.id}_${attackType}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("PDF Export error:", err);
+      setExportError(`Export failed: ${err.message}`);
+      setTimeout(() => setExportError(null), 5000);
+    } finally {
+      setExportingId(null);
+    }
   };
 
   const getRiskColorClass = (score) => {
@@ -131,25 +166,35 @@ export default function IncidentsSection({
         </div>
       </div>
 
+      {exportError && (
+        <div className="report-export-error-banner">
+          <span>{exportError}</span>
+          <button type="button" onClick={() => setExportError(null)} title="Dismiss">
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
       {/* MINIMAL ENTERPRISE DATA TABLE */}
       <div className="table-responsive">
         <table className="modern-enterprise-table incidents-table">
           <thead>
             <tr>
-              <th style={{ width: "80px" }}>ID</th>
+              <th style={{ width: "70px" }}>ID</th>
               <th>Incident</th>
-              <th style={{ width: "160px" }}>Source IP</th>
-              <th style={{ width: "130px" }}>Risk</th>
-              <th style={{ width: "110px" }}>Severity</th>
-              <th style={{ width: "120px" }}>Status</th>
-              <th style={{ width: "80px", textAlign: "right" }}>Action</th>
+              <th style={{ width: "150px" }}>Source IP</th>
+              <th style={{ width: "120px" }}>Country</th>
+              <th style={{ width: "120px" }}>Risk</th>
+              <th style={{ width: "100px" }}>Severity</th>
+              <th style={{ width: "110px" }}>Status</th>
+              <th style={{ width: "180px", textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7" className="empty-cell">
+                <td colSpan="8" className="empty-cell">
                   <div className="empty-message-wrap">
                     <span className="loading-spinner" />
                     <span>Loading security incidents...</span>
@@ -158,7 +203,7 @@ export default function IncidentsSection({
               </tr>
             ) : incidents.length === 0 ? (
               <tr>
-                <td colSpan="7" className="empty-cell">
+                <td colSpan="8" className="empty-cell">
                   <div className="empty-message-wrap">
                     <AlertTriangle size={18} className="empty-state-icon text-muted" />
                     <span className="empty-title">No incidents detected</span>
@@ -167,7 +212,7 @@ export default function IncidentsSection({
               </tr>
             ) : filteredIncidents.length === 0 ? (
               <tr>
-                <td colSpan="7" className="empty-cell">
+                <td colSpan="8" className="empty-cell">
                   <div className="empty-message-wrap">
                     <Search size={20} className="empty-state-icon text-muted" />
                     <span className="empty-title">No matching incidents found</span>
@@ -189,7 +234,7 @@ export default function IncidentsSection({
                     className="modern-table-row"
                     onClick={() => onSelectIncident(incident)}
                     tabIndex={0}
-                    title="Click to view full investigation workspace"
+                    title="Click row to investigate incident"
                   >
                     <td>
                       <span className="row-id-text">#{incident.id}</span>
@@ -208,6 +253,10 @@ export default function IncidentsSection({
 
                     <td>
                       <span className="ip-mono-clean">{incident.source_ip}</span>
+                    </td>
+
+                    <td>
+                      <span className="country-clean-text">{incident.country || "—"}</span>
                     </td>
 
                     <td>
@@ -239,18 +288,40 @@ export default function IncidentsSection({
                     </td>
 
                     <td style={{ textAlign: "right" }}>
-                      <button
-                        type="button"
-                        className="btn-action-view"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectIncident(incident);
-                        }}
-                        title="Investigate incident"
-                      >
-                        <span>View</span>
-                        <ChevronRight size={13} />
-                      </button>
+                      <div className="table-row-actions">
+                        <button
+                          type="button"
+                          className="btn-action-view"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectIncident(incident);
+                          }}
+                          title="Investigate incident"
+                        >
+                          <span>View</span>
+                          <ChevronRight size={13} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-action-export"
+                          onClick={(e) => handleExportPdf(e, incident)}
+                          disabled={exportingId === incident.id}
+                          title="Export Incident PDF Report"
+                        >
+                          {exportingId === incident.id ? (
+                            <>
+                              <Loader2 size={11} className="spin-icon" />
+                              <span>Exporting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <FileDown size={12} />
+                              <span>Export PDF</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
