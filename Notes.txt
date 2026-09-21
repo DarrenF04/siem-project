@@ -1,1 +1,0 @@
-We're using parameterized SQL queries, which helps prevent SQL injection.
