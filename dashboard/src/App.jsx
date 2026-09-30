@@ -3,6 +3,7 @@ import Header from "./components/Header";
 import DashboardPage from "./pages/DashboardPage";
 import IncidentsPage from "./pages/IncidentsPage";
 import EventsPage from "./pages/EventsPage";
+import SIEMAIPage from "./pages/SIEMAIPage";
 import AttackSimulator from "./AttackSimulator";
 import InvestigationModal from "./components/InvestigationModal";
 import { useLiveAlerts } from "./hooks/useLiveAlerts";
@@ -43,22 +44,24 @@ function App() {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
-  // Dedicated Page Routing (dashboard, incidents, events, simulator)
+  // Dedicated Page Routing (dashboard, incidents, events, ai, simulator)
   const [activePage, setActivePage] = useState(() => {
     try {
       const hash = window.location.hash.replace("#/", "").replace("#", "");
-      const validPages = ["dashboard", "incidents", "events", "simulator"];
+      const validPages = ["dashboard", "incidents", "events", "ai", "simulator"];
       return validPages.includes(hash) ? hash : "dashboard";
     } catch {
       return "dashboard";
     }
   });
 
+  const [pendingAIQuery, setPendingAIQuery] = useState(null);
+
   // Keep browser hash in sync
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace("#/", "").replace("#", "");
-      const validPages = ["dashboard", "incidents", "events", "simulator"];
+      const validPages = ["dashboard", "incidents", "events", "ai", "simulator"];
       if (validPages.includes(hash)) {
         setActivePage(hash);
       }
@@ -72,6 +75,11 @@ function App() {
     setActivePage(pageId);
     window.location.hash = `#/${pageId}`;
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleAskAI = (query) => {
+    setPendingAIQuery(query);
+    handleNavigate("ai");
   };
 
   // Simulated attacks state for recent simulator history
@@ -405,7 +413,18 @@ function App() {
           />
         )}
 
-        {/* 4. ATTACK SIMULATOR PAGE (DEDICATED) */}
+        {/* 4. SIEM AI ANALYST PAGE (DEDICATED) */}
+        {activePage === "ai" && (
+          <SIEMAIPage
+            pendingQuery={pendingAIQuery}
+            onClearPendingQuery={() => setPendingAIQuery(null)}
+            onSelectIncident={setSelectedIncident}
+            incidents={incidents}
+            statistics={statistics}
+          />
+        )}
+
+        {/* 5. ATTACK SIMULATOR PAGE (DEDICATED) */}
         {activePage === "simulator" && (
           <AttackSimulator
             onAttackSimulated={handleAttackSimulated}
@@ -420,6 +439,7 @@ function App() {
           onUpdateStatus={updateIncidentStatus}
           events={events}
           getSeverityClass={getSeverityClass}
+          onAskAI={handleAskAI}
         />
       </main>
     </div>

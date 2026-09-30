@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   FileDown,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 
 export default function InvestigationModal({
@@ -19,6 +20,7 @@ export default function InvestigationModal({
   onUpdateStatus,
   events,
   getSeverityClass,
+  onAskAI,
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -90,6 +92,21 @@ export default function InvestigationModal({
           </div>
 
           <div className="modal-header-actions">
+            <button
+              type="button"
+              className="btn-modal-ask-ai"
+              onClick={() => {
+                if (onAskAI) {
+                  onAskAI(`Analyze incident #${selectedIncident.id}`);
+                  onClose();
+                }
+              }}
+              title="Ask SIEM AI to analyze this incident"
+            >
+              <Sparkles size={13} />
+              <span>Ask SIEM AI</span>
+            </button>
+
             <button
               type="button"
               className="btn-modal-export-pdf"

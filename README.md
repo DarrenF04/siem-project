@@ -123,6 +123,24 @@ Incident Overview 2. Incident Summary 3. Correlation Analysis 4. Event
 Timeline 5. Source Information 6. Event Statistics 7. Raw Event Evidence
 8. Persisted Incident Record
 
+### SIEM AI Analyst
+
+A conversational security analyst interface powered by **Google Gemini** that interprets natural-language security questions, strictly grounded in live SQLite SIEM telemetry.
+
+**Key capabilities:**
+- **Zero Hallucination Grounding:** Real SQLite telemetry (`security_events`, `security_incidents`) is retrieved on every query. The model answers using only actual persisted data.
+- **Truthful Geolocation:** Unlocated events explicitly display "Country: Not Reported". No fake IP geolocation is performed.
+- **Investigation Modal Integration:** One-click "Ask SIEM AI" button inside the Investigation Modal immediately initiates analysis for that specific incident.
+- **Dual-Mode UI:** Clean, centered chat interface with responsive security suggestion cards and floating bottom input dock in both Dark and Light themes.
+- **API Key Security:** Gemini API calls are strictly handled server-side in FastAPI. No keys are ever exposed to the browser.
+- **Graceful Unconfigured Mode:** Operates seamlessly even before an API key is inserted by providing structured database-grounded analysis.
+
+**Configuration (`.env`):**
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+```
+
 ## Technology Stack
 
 ### Backend
@@ -131,6 +149,8 @@ Timeline 5. Source Information 6. Event Statistics 7. Raw Event Evidence
 -   FastAPI
 -   SQLite
 -   ReportLab
+-   Google Gemini SDK (`google-genai`)
+-   `python-dotenv`
 
 ### Frontend
 
@@ -138,6 +158,7 @@ Timeline 5. Source Information 6. Event Statistics 7. Raw Event Evidence
 -   Vite
 -   Recharts
 -   Lucide React
+-   `react-markdown` & `remark-gfm`
 
 ### Development
 
@@ -152,7 +173,8 @@ siem-project/
 ├── backend/
 │   ├── main.py
 │   ├── simulator.py
-│   └── report_generator.py
+│   ├── report_generator.py
+│   └── siem_ai.py             ← Google Gemini Grounded AI Engine
 ├── dashboard/
 │   └── src/
 │       ├── App.jsx
@@ -170,7 +192,8 @@ siem-project/
 │       ├── hooks/
 │       │   └── useLiveAlerts.js
 │       └── pages/
-│           └── DashboardPage.jsx
+│           ├── DashboardPage.jsx
+│           └── SIEMAIPage.jsx     ← SIEM AI Analyst Chat Experience
 ├── database/
 │   ├── __init__.py
 │   ├── db.py

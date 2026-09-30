@@ -29,6 +29,7 @@ export default function Header({
     { id: "dashboard", label: "Dashboard" },
     { id: "incidents", label: "Incidents" },
     { id: "events", label: "Events" },
+    { id: "ai", label: "AI Analyst" },
     { id: "simulator", label: "Simulator" },
   ];
 
@@ -40,6 +41,7 @@ export default function Header({
     dashboard: "Security Operations Overview",
     incidents: "Security Incidents Queue",
     events: "Live Security Event",
+    ai: "SIEM AI Analyst",
     simulator: "Attack Simulation & Testing Console",
   };
 
