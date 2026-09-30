@@ -2,123 +2,58 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  ShieldAlert,
-  Activity,
-  Users,
-  Terminal,
-  Globe,
-  Target,
-  ArrowUpRight,
-  Send,
-  User,
+  Shield,
+  Sparkles,
+  ArrowUp,
   RotateCcw,
   Copy,
   Check,
   ExternalLink,
   Loader2,
-  Search,
-  ShieldCheck,
-  Flame,
-  Radio,
+  User,
+  ShieldAlert,
 } from "lucide-react";
 
 const API_URL = "http://127.0.0.1:8000";
 
-// Dashboard-aligned SOC inquiry cards matching the KPI visual design
-const SOC_QUERY_CARDS = [
-  {
-    id: "today",
-    category: "LIVE INCIDENTS",
-    query: "What happened today?",
-    title: "Today's Threat Summary",
-    desc: "Inspect security events and incident activity recorded today",
-    icon: ShieldAlert,
-    colorClass: "color-green",
-    badgeText: "Real-time",
-  },
-  {
-    id: "critical",
-    category: "PRIORITY TRIAGE",
-    query: "Show me critical incidents",
-    title: "Critical & High-Risk Alerts",
-    desc: "Review high-severity incidents requiring immediate containment",
-    icon: Users,
-    colorClass: "color-pink",
-    badgeText: "High Sev",
-  },
-  {
-    id: "recent",
-    category: "LOG TELEMETRY",
-    query: "What was the most recent attack?",
-    title: "Most Recent Attack Chain",
-    desc: "Step through the latest correlated attack and event sequence",
-    icon: Activity,
-    colorClass: "color-blue",
-    badgeText: "Correlated",
-  },
-  {
-    id: "latest",
-    category: "KILL CHAIN ANALYSIS",
-    query: "Analyze the latest incident",
-    title: "Deep Incident Analysis",
-    desc: "Break down authentication bypass and command execution steps",
-    icon: Terminal,
-    colorClass: "color-amber",
-    badgeText: "Forensics",
-  },
-  {
-    id: "countries",
-    category: "GEO EXPOSURE",
-    query: "Which country has the most attacks?",
-    title: "Geographic Attack Origins",
-    desc: "Analyze reported attacker locations from the World Threat Map",
-    icon: Globe,
-    colorClass: "color-cyan",
-    badgeText: "Location",
-  },
-  {
-    id: "risk",
-    category: "HOSTILE RECON",
-    query: "Which IP has the highest risk?",
-    title: "Highest Risk Source IPs",
-    desc: "Identify top hostile IP addresses and cumulative risk scores",
-    icon: Target,
-    colorClass: "color-purple",
-    badgeText: "Risk: 90",
-  },
-];
-
-// Quick query action chips
-const QUICK_FILTER_PILLS = [
-  { label: "What happened today?", query: "What happened today?" },
-  { label: "Show recent attacks", query: "What was the most recent attack?" },
-  { label: "Show critical incidents", query: "Show me critical incidents" },
-  { label: "Highest risk IP", query: "Which IP has the highest risk?" },
-  { label: "Attack by country", query: "Which country has the most attacks?" },
-];
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good Morning";
+  if (hour < 18) return "Good Afternoon";
+  return "Good Evening";
+}
 
 export default function SIEMAIPage({
   pendingQuery,
   onClearPendingQuery,
   onSelectIncident,
   incidents = [],
-  statistics = {},
+  aiStatus: propAiStatus,
+  onUpdateAIStatus,
 }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [aiStatus, setAiStatus] = useState({
-    available: true,
-    configured: false,
-    model: "gemini-2.5-flash",
-    provider: "Google Gemini",
-  });
+  const [aiStatus, setAiStatus] = useState(
+    propAiStatus || {
+      available: true,
+      configured: false,
+      model: "gemini-2.5-flash",
+      provider: "Google Gemini",
+    }
+  );
   const [copiedIndex, setCopiedIndex] = useState(null);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Fetch AI backend status
+  useEffect(() => {
+    if (propAiStatus) {
+      setAiStatus(propAiStatus);
+    }
+  }, [propAiStatus]);
+
+  // Fetch initial AI backend status
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -126,6 +61,7 @@ export default function SIEMAIPage({
         if (res.ok) {
           const data = await res.json();
           setAiStatus(data);
+          if (onUpdateAIStatus) onUpdateAIStatus(data);
         }
       } catch (err) {
         console.warn("AI status check error:", err);
@@ -191,10 +127,25 @@ export default function SIEMAIPage({
         content: data.answer || "No response received from SIEM AI.",
         sources: data.sources || [],
         metadata: data.metadata || {},
+        fallback: data.fallback ?? (data.provider !== "Google Gemini"),
+        provider: data.provider || data.metadata?.provider,
+        model: data.model_used || data.metadata?.model,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+
+      if (data.metadata?.configured !== undefined) {
+        const nextStatus = {
+          configured: data.metadata.configured && !data.fallback,
+          model: data.model_used || data.metadata.model || "gemini-2.5-flash",
+          provider: data.provider || data.metadata.provider || "Google Gemini",
+        };
+        setAiStatus((prev) => ({ ...prev, ...nextStatus }));
+        if (onUpdateAIStatus) {
+          onUpdateAIStatus((prev) => ({ ...prev, ...nextStatus }));
+        }
+      }
     } catch (err) {
       console.error("AI Chat request failed:", err);
       setMessages((prev) => [
@@ -204,6 +155,8 @@ export default function SIEMAIPage({
           role: "assistant",
           content: `⚠️ **Unable to complete analysis:** ${err.message}. Please verify the FastAPI backend is running.`,
           sources: [],
+          metadata: { fallback: true, error: err.message },
+          fallback: true,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
@@ -229,6 +182,7 @@ export default function SIEMAIPage({
   const handleResetChat = () => {
     setMessages([]);
     setInputValue("");
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const handleOpenSourceIncident = (incidentId) => {
@@ -248,151 +202,108 @@ export default function SIEMAIPage({
   };
 
   const hasMessages = messages.length > 0;
-  const openCount = statistics.open_incidents ?? statistics.active_incidents ?? 0;
-  const eventCount = statistics.total_events ?? 0;
-  const critCount = statistics.critical_incidents ?? 0;
+  const greeting = getGreeting();
 
   // Derive active engine badge from the most recent assistant message metadata
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
   const lastMeta = lastAssistantMsg?.metadata || {};
   const isGeminiActive =
-    lastMeta.fallback === false ||
-    (lastMeta.provider && lastMeta.provider.includes("Gemini") && !lastMeta.fallback);
-  const activeModel = lastMeta.model || aiStatus.model || "gemini-2.5-flash";
+    lastAssistantMsg
+      ? lastAssistantMsg.fallback === false
+      : aiStatus.configured;
+  const activeModel =
+    lastAssistantMsg?.model ||
+    lastMeta.model ||
+    aiStatus.model ||
+    "gemini-3.5-flash";
+
   const engineLabel = isGeminiActive
     ? `Gemini • ${activeModel}`
-    : aiStatus.configured && !hasMessages
-    ? `Gemini • ${aiStatus.model}`
     : "SQLite Grounded Engine";
-  const engineOnline = isGeminiActive || (aiStatus.configured && !hasMessages);
+  const engineOnline = isGeminiActive;
 
   return (
-    <div className="siem-ai-wrapper soc-theme-layout">
-      {/* TOP STATUS BAR & ACTIONS */}
-      <div className="ai-top-bar">
-        <div className="soc-engine-status-group">
-          <div className="ai-model-pill" title="Backend AI Engine Status">
-            <span className={`status-indicator-dot ${engineOnline ? "dot-online" : "dot-grounded"}`} />
-            <span className="model-label">
-              {engineLabel}
-            </span>
-          </div>
-
-        
-        </div>
-
-        {hasMessages && (
+    <div className={`siem-ai-page-root ${hasMessages ? "has-thread" : "is-empty"}`}>
+      {/* ACTIONS TOP BAR — ONLY WHEN THREAD IS ACTIVE */}
+      {hasMessages && (
+        <header className="siem-ai-subtle-top-bar has-actions-only">
           <button
             type="button"
-            className="btn-new-chat"
+            className="btn-new-investigation"
             onClick={handleResetChat}
             title="Clear and start a new investigation"
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={13} />
             <span>New Investigation</span>
           </button>
-        )}
-      </div>
+        </header>
+      )}
 
-      {/* MAIN CONTAINER */}
-      <div className="ai-main-container">
-        {!hasMessages ? (
-          /* SOC INVESTIGATION LANDING VIEW */
-          <div className="ai-landing-view soc-landing">
-            {/* Concentric SOC Security Emblem */}
-            <div className="soc-hero-badge-wrap">
-              <div className="kpi-icon-concentric color-green hero-concentric" title="SIEM Security Intelligence">
-                <ShieldAlert size={24} />
+      {/* MAIN VIEW */}
+      {!hasMessages ? (
+        /* MINIMAL EMPTY STATE — REFERENCING ATTACHED DESIGN */
+        <main className="siem-ai-hero-empty">
+          <div className="siem-ai-hero-center">
+            {/* 1. Small security/SIEM icon or subtle circular emblem */}
+            <div className="siem-ai-emblem-wrapper" aria-hidden="true">
+              <div className="siem-ai-emblem">
+                <Shield size={20} className="siem-ai-emblem-icon" />
               </div>
             </div>
 
-            {/* Enterprise SOC Header */}
-            <div className="ai-greeting-header">
-              <div className="soc-header-tag">
-                <ShieldCheck size={13} />
-                <span>AUTONOMOUS SECURITY ANALYST</span>
-              </div>
-              <h1 className="ai-greeting-title">Security Intelligence Assistant</h1>
-              <p className="ai-greeting-caption">
-                Analyze live security events, investigate correlated attack chains, and inspect threat actors grounded in your database.
-              </p>
-            </div>
+            {/* 2. Dynamic Local Time Greeting */}
+            <h2 className="siem-ai-greeting-text">{greeting}</h2>
 
-            {/* Live Telemetry Pulse Bar (Reflecting Dashboard KPIs) */}
-            <div className="soc-telemetry-pulse-bar">
-              <div className="telemetry-pill-stat">
-                <div className="concentric-mini-dot color-green">
-                  <ShieldAlert size={12} />
-                </div>
-                <span className="stat-number">{openCount}</span>
-                <span className="stat-label">Active Incidents</span>
-              </div>
+            {/* 3. Main heading */}
+            <h1 className="siem-ai-heading-text">
+              What&apos;s on <span className="siem-ai-accent-span">your mind?</span>
+            </h1>
 
-              <div className="pulse-divider" />
-
-              <div className="telemetry-pill-stat">
-                <div className="concentric-mini-dot color-blue">
-                  <Activity size={12} />
-                </div>
-                <span className="stat-number">{eventCount.toLocaleString()}</span>
-                <span className="stat-label">Events Ingested</span>
+            {/* 4. ONE CHAT BOX */}
+            <div className="siem-ai-hero-box">
+              <div className="siem-ai-hero-input-area">
+                <Sparkles size={16} className="siem-ai-sparkle-icon" aria-hidden="true" />
+                <textarea
+                  ref={inputRef}
+                  rows={2}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask SIEM Analyst..."
+                  className="siem-ai-hero-textarea"
+                  disabled={isLoading}
+                  autoFocus
+                />
               </div>
 
-              <div className="pulse-divider" />
-
-              <div className="telemetry-pill-stat">
-                <div className="concentric-mini-dot color-pink">
-                  <Users size={12} />
-                </div>
-                <span className="stat-number">{critCount}</span>
-                <span className="stat-label">Critical Alerts</span>
-              </div>
-            </div>
-
-            {/* Dashboard-Aligned Inquiry Cards Grid */}
-            <div className="soc-cards-grid">
-              {SOC_QUERY_CARDS.map((card) => {
-                const IconComponent = card.icon;
-                return (
-                  <div
-                    key={card.id}
-                    className={`soc-prompt-card ${card.colorClass}`}
-                    onClick={() => handleSendMessage(card.query)}
-                    role="button"
-                    tabIndex={0}
+              <div className="siem-ai-hero-footer">
+                <div className="siem-ai-hero-actions-right">
+                  <button
+                    type="button"
+                    className={`siem-ai-hero-send-btn ${inputValue.trim() && !isLoading ? "active" : ""}`}
+                    onClick={() => handleSendMessage()}
+                    disabled={!inputValue.trim() || isLoading}
+                    aria-label="Send query"
                   >
-                    <div className="card-top-row">
-                      <div className="card-icon-title-group">
-                        <div className="kpi-icon-concentric" title={card.category}>
-                          <IconComponent size={18} />
-                        </div>
-                        <div className="card-category-stack">
-                          <span className="card-cat-label">{card.category}</span>
-                          <span className="card-badge-pill">{card.badgeText}</span>
-                        </div>
-                      </div>
-
-                      <div className="kpi-arrow-circle-btn" title="Run this analysis">
-                        <ArrowUpRight size={14} />
-                      </div>
-                    </div>
-
-                    <div className="card-query-body">
-                      <h3 className="card-query-title">{card.title}</h3>
-                      <p className="card-query-desc">{card.desc}</p>
-                    </div>
-                  </div>
-                );
-              })}
+                    {isLoading ? (
+                      <Loader2 size={15} className="spin-icon" />
+                    ) : (
+                      <ArrowUp size={16} />
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        ) : (
-          /* CONVERSATION THREAD */
-          <div className="ai-conversation-thread">
+        </main>
+      ) : (
+        /* CONVERSATION THREAD VIEW */
+        <main className="siem-ai-conversation-view">
+          <div className="siem-ai-thread-container">
             {messages.map((msg, index) => {
               const isUser = msg.role === "user";
               return (
-                <div
+                <article
                   key={msg.id}
                   className={`ai-message-row ${isUser ? "row-user" : "row-assistant"}`}
                 >
@@ -402,7 +313,7 @@ export default function SIEMAIPage({
                         <User size={15} />
                       </div>
                     ) : (
-                      <div className="kpi-icon-concentric color-green avatar-soc-bot" title="SIEM AI Analyst">
+                      <div className="avatar-soc-bot" title="SIEM AI Analyst">
                         <ShieldAlert size={14} />
                       </div>
                     )}
@@ -423,7 +334,7 @@ export default function SIEMAIPage({
 
                     {/* Metadata & Cited Evidence Footer */}
                     {!isUser && (
-                      <div className="message-footer-bar">
+                      <footer className="message-footer-bar">
                         <span className="msg-time">{msg.timestamp}</span>
 
                         <div className="footer-actions">
@@ -464,10 +375,10 @@ export default function SIEMAIPage({
                             )}
                           </button>
                         </div>
-                      </div>
+                      </footer>
                     )}
                   </div>
-                </div>
+                </article>
               );
             })}
 
@@ -475,7 +386,7 @@ export default function SIEMAIPage({
             {isLoading && (
               <div className="ai-message-row row-assistant">
                 <div className="message-avatar">
-                  <div className="kpi-icon-concentric color-green avatar-soc-bot pulse-avatar">
+                  <div className="avatar-soc-bot pulse-avatar">
                     <ShieldAlert size={14} />
                   </div>
                 </div>
@@ -485,72 +396,50 @@ export default function SIEMAIPage({
                     <span />
                     <span />
                   </div>
-                  <span className="loading-label">{aiStatus.configured ? "Querying Gemini AI & correlating kill chain..." : "Querying SQLite telemetry & correlating kill chain..."}</span>
+                  <span className="loading-label">Looking into it...</span>
                 </div>
               </div>
             )}
 
             <div ref={messagesEndRef} />
           </div>
-        )}
-      </div>
 
-      {/* DOCKED INPUT AREA & QUICK FILTER PILLS */}
-      <div className="ai-input-dock soc-dock">
-        {/* Quick query chips */}
-        <div className="soc-quick-pills-row">
-          {QUICK_FILTER_PILLS.map((pill, idx) => (
-            <button
-              key={idx}
-              type="button"
-              className="soc-quick-pill"
-              onClick={() => handleSendMessage(pill.query)}
-              disabled={isLoading}
-            >
-              <span>{pill.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Input Bar */}
-        <div className="ai-input-pill-container soc-input-container">
-          <div className="input-left-icon" aria-hidden="true" title="Terminal Query">
-            <Terminal size={17} className="pill-terminal-icon" />
+          {/* DOCKED INPUT BAR AT BOTTOM OF CONVERSATION */}
+          <div className="siem-ai-docked-input-wrap">
+            <div className="siem-ai-hero-box docked-box">
+              <div className="siem-ai-hero-input-area docked-area">
+                <Sparkles size={16} className="siem-ai-sparkle-icon" aria-hidden="true" />
+                <textarea
+                  ref={inputRef}
+                  rows={1}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask SIEM Analyst... (e.g. 'Analyze incident #9', 'Tell me about 192.168.100.177')"
+                  className="siem-ai-hero-textarea docked-textarea"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  className={`siem-ai-hero-send-btn ${inputValue.trim() && !isLoading ? "active" : ""}`}
+                  onClick={() => handleSendMessage()}
+                  disabled={!inputValue.trim() || isLoading}
+                  aria-label="Send query"
+                >
+                  {isLoading ? (
+                    <Loader2 size={15} className="spin-icon" />
+                  ) : (
+                    <ArrowUp size={16} />
+                  )}
+                </button>
+              </div>
+            </div>
+            <p className="siem-ai-docked-hint">
+              Grounded in live SQLite telemetry • Read-only queries
+            </p>
           </div>
-
-          <textarea
-            ref={inputRef}
-            rows={1}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask SIEM Analyst... (e.g. 'What was the most recent attack?', 'Analyze incident #9', 'Tell me about 192.168.100.177')"
-            className="ai-textarea-field"
-            disabled={isLoading}
-          />
-
-          <button
-            type="button"
-            className={`ai-send-btn ${inputValue.trim() && !isLoading ? "active" : ""}`}
-            onClick={() => handleSendMessage()}
-            disabled={!inputValue.trim() || isLoading}
-            aria-label="Submit query"
-          >
-            {isLoading ? (
-              <Loader2 size={15} className="spin-icon" />
-            ) : (
-              <>
-                <Send size={14} className="send-glyph" />
-                <span className="send-text">Send</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        <p className="ai-input-disclaimer">
-          Grounded in live SQLite telemetry • Read-only queries • Real-time SOC correlation
-        </p>
-      </div>
+        </main>
+      )}
     </div>
   );
 }

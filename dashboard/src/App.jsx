@@ -126,6 +126,23 @@ function App() {
   // Selected incident for investigation modal
   const [selectedIncident, setSelectedIncident] = useState(null);
 
+  // SIEM AI backend status
+  const [aiStatus, setAiStatus] = useState({
+    available: true,
+    configured: false,
+    model: "gemini-2.5-flash",
+    provider: "Google Gemini",
+  });
+
+  useEffect(() => {
+    fetch(`${API_URL}/ai/status`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setAiStatus(data);
+      })
+      .catch((err) => console.warn("AI status check error:", err));
+  }, []);
+
   // Live security alert notification system
   const { alerts, dismissAlert, dismissAllAlerts } = useLiveAlerts(incidents, loading);
 
@@ -352,6 +369,7 @@ function App() {
         onDismissAllAlerts={dismissAllAlerts}
         onSelectIncident={setSelectedIncident}
         incidents={incidents}
+        aiStatus={aiStatus}
       />
 
       {/* MAIN DEDICATED PAGE WORKSPACE */}
@@ -421,6 +439,8 @@ function App() {
             onSelectIncident={setSelectedIncident}
             incidents={incidents}
             statistics={statistics}
+            aiStatus={aiStatus}
+            onUpdateAIStatus={setAiStatus}
           />
         )}
 
