@@ -1,11 +1,14 @@
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from database.db import create_database
 from backend.simulator import router as simulator_router
 from backend.report_generator import generate_incident_pdf, get_related_events_for_incident
+from backend.siem_ai import analyze_siem_query, get_gemini_config
 
 project_dir = Path(__file__).resolve().parent.parent
 db_file = project_dir / "database" / "siem.db"
@@ -184,4 +187,38 @@ def export_incident_pdf(incident_id: int):
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
+
+
+# ── SIEM AI Analyst Endpoints (Google Gemini Grounded Engine) ─────────────────
+
+class AIChatRequest(BaseModel):
+    message: str
+    conversation_history: Optional[List[Dict[str, str]]] = []
+
+
+@app.get("/ai/status")
+def get_ai_status():
+    """Check Gemini AI Analyst status and model availability."""
+    config = get_gemini_config()
+    return {
+        "available": True,
+        "configured": config["configured"],
+        "model": config["model"],
+        "provider": "Google Gemini" if config["configured"] else "SIEM Local Telemetry Engine",
+        "description": "Google Gemini security analysis grounded in SQLite telemetry"
+    }
+
+
+@app.post("/ai/chat")
+def post_ai_chat(request: AIChatRequest):
+    """
+    Handle natural language security queries.
+    Retrieves grounded telemetry from SQLite, then calls Gemini or generates
+    structured grounded response if GEMINI_API_KEY is not yet configured.
+    """
+    if not request.message or not request.message.strip():
+        raise HTTPException(status_code=400, detail="Query message cannot be empty")
+
+    result = analyze_siem_query(request.message.strip(), request.conversation_history)
+    return result
 

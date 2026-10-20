@@ -9,6 +9,16 @@ import {
 } from "lucide-react";
 import NotificationPopover from "./NotificationPopover";
 
+function formatModelName(modelStr) {
+  if (!modelStr) return "Gemini 2.5 Flash";
+  const clean = modelStr.replace(/^Gemini\s*•\s*/i, "").trim().toLowerCase();
+  if (clean.includes("2.5")) return "Gemini 2.5 Flash";
+  if (clean.includes("3.5-flash-lite")) return "Gemini 3.5 Flash Lite";
+  if (clean.includes("3.5")) return "Gemini 3.5 Flash";
+  if (clean.includes("3.8")) return "Gemini 3.8 Flash";
+  return "Gemini 2.5 Flash";
+}
+
 export default function Header({
   lastUpdated,
   onRefresh,
@@ -23,12 +33,14 @@ export default function Header({
   onDismissAllAlerts,
   onSelectIncident,
   incidents = [],
+  aiStatus,
 }) {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const navItems = [
     { id: "dashboard", label: "Dashboard" },
     { id: "incidents", label: "Incidents" },
     { id: "events", label: "Events" },
+    { id: "ai", label: "AI Analyst" },
     { id: "simulator", label: "Simulator" },
   ];
 
@@ -40,6 +52,7 @@ export default function Header({
     dashboard: "Security Operations Overview",
     incidents: "Security Incidents Queue",
     events: "Live Security Event",
+    ai: "SIEM AI Analyst",
     simulator: "Attack Simulation & Testing Console",
   };
 
@@ -159,6 +172,20 @@ export default function Header({
       <div className="page-title-banner">
         <div className="page-title-left">
           <h1>{pageTitles[activePage] || "Security Operations Overview"}</h1>
+          {activePage === "ai" && (
+            <div className="header-ai-model-status" title="Active SIEM AI Telemetry Engine">
+              <span
+                className={`status-indicator-dot ${
+                  aiStatus?.configured ? "dot-online" : "dot-grounded"
+                }`}
+              />
+              <span className="header-ai-model-name">
+                {aiStatus?.configured
+                  ? formatModelName(aiStatus.model)
+                  : "SQLite Grounded Engine"}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="page-title-right">
